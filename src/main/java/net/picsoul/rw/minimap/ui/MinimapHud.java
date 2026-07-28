@@ -350,7 +350,15 @@ public class MinimapHud {
         mapBox.updateStyle();
         marker.updateStyle();
         if (tierCompass) {
-            updateCardinalLabels(heading);
+            // v2.84 fix: this used to always swing the N/S/E/W ring by
+            // -heading, even with "rotate with heading" OFF - so in the
+            // default north-up mode (where the map image itself never
+            // rotates, only the player marker does), the cardinal ring was
+            // incorrectly spinning around anyway. Only rotate-with-heading
+            // mode should move the ring (to track mapBox's own -heading
+            // rotation, see above); north-up mode keeps it fixed (N always
+            // at top), matching mapBox staying at rotate(0).
+            updateCardinalLabels(prefs.rotate ? heading : 0f);
         }
         lastHeading = heading;
     }

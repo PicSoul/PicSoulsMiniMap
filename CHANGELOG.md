@@ -2493,3 +2493,27 @@ written.
   unfixable engine issue, and the render-rate limiter may turn out to be
   unnecessary. If it still crashes, re-enable a conservative renderrate
   alongside this fix.
+
+- **v2.84: fix cardinal direction labels rotating even in north-up mode.**
+  User reported the N/S/E/W ring rotating "twice as fast" as expected (e.g.
+  turning 90° from North to East made South appear where North had been).
+  Traced `MinimapHud.updateInfo()`: it called `updateCardinalLabels(heading)`
+  unconditionally whenever the compass tier is active, regardless of
+  `prefs.rotate` - but the ring's positions are meant to track the *map's
+  own* rotation (`mapBox.style.rotate.set(-heading)`, rotate-with-heading
+  mode only) so they visually stay pinned to the rotating map. In the
+  default north-up mode, `mapBox` never rotates (`rotate(0)` always) - only
+  the player marker does - so the cardinal ring should stay completely
+  fixed (N always at top) too, but was incorrectly still swinging by
+  `-heading` regardless. Fixed by passing `0f` instead of the real heading
+  when `prefs.rotate` is off, so the ring only moves in rotate-with-heading
+  mode, matching the map image it's meant to track.
+  NOTE: this fixes a confirmed, real bug (labels moving at all in north-up
+  mode, the default) - re-derived the rotate-with-heading math carefully
+  (rotating a container by angle a shifts its content's apparent angle by
+  +a) and it's internally consistent with mapBox's own rotation, so that
+  mode's formula was left unchanged. Wants confirmation this actually
+  resolves what was reported - if the "2x" effect specifically persists
+  with rotate-with-heading turned ON (not just the north-up default), that
+  would point at something else (possibly an SDK-specific rotate() quirk)
+  not covered by this fix.
