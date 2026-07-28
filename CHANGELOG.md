@@ -2326,3 +2326,31 @@ written.
   root cause and the real fix is routing the render-triggering tick work
   through `enqueue()`/`executeDelayed()` instead of `Timer`, not a change to
   any rendering logic itself.
+
+- **v2.79: diagnostic-only - added `/mm fakerender`, isolating texture-asset
+  churn from chunk reads.** The v2.78 check came back: `Plugin.isMainThread()`
+  returned true from inside `tick()` - Timer callbacks ARE on the main
+  thread, ruling out the threading theory entirely. That session (terrain on,
+  ~2.5 minutes) ended in a normal quit, not a crash - likely too short to
+  reproduce, but the thread-safety question is now answered either way.
+  With cave detection, JVM heap leaks, and thread-safety all ruled out, the
+  remaining two candidates within the render pipeline (confirmed by `/mm
+  terrain off` to be involved at all) are the chunk/world reads themselves,
+  or the per-render native texture create/dispose cycle (`MinimapHud
+  .onRenderDone`, via `AssetSalt` + `TextureAsset`). Neither existing
+  diagnostic toggle (`terrain`, `notex`) can isolate one from the other -
+  both gate the whole pipeline together.
+  Added `config.diagFakeTextureChurn` (`/mm fakerender [on|off]`, NOT
+  persisted - resets to off on restart, since it breaks the visible map):
+  when on, every time the HUD would normally trigger a real re-render (same
+  movedFar/fillDue cadence, same bookkeeping), it instead only creates and
+  immediately disposes one small dummy native texture via `MinimapHud
+  .fakeChurnTick()` - zero `World`/`Chunk` calls, same asset-churn rate. If
+  this alone crashes at the same ~8-12 minute mark, the game's own asset
+  registry (already known to be fragile - see `AssetSalt`'s doc comment
+  about duplicate texture names) is implicated, independent of chunk data.
+  If it runs indefinitely without crashing, the chunk/raw-terrain reads are
+  implicated instead.
+  NOTE: wants the user to run with `/mm terrain on` + `/mm fakerender on`
+  together for at least 10-15 minutes (longer than any crash seen so far)
+  to get a clean result either way.

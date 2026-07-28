@@ -58,7 +58,7 @@ import net.picsoul.rw.minimap.waypoint.WaypointService;
 
 public class PicSoulsMiniMap extends Plugin implements Listener {
 
-    public static final String PLUGIN_VERSION = "2.78";
+    public static final String PLUGIN_VERSION = "2.79";
     private static final String TAG = "[PicSoulsMiniMap]";
     /** Item type id of the vanilla map (confirmed from the game log: "map (59)"). */
     private static final short VANILLA_MAP_TYPE_ID = 59;
@@ -942,6 +942,18 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
                         + " — applied now; persists. Diagnostic: tests whether the"
                         + " number of UI elements is what kills a switched world.");
             }
+            case "fakerender" -> {
+                // Deliberately NOT persisted (unlike the other diagnostic
+                // toggles) - this breaks the visible terrain map entirely, so
+                // it should never silently survive a restart.
+                config.diagFakeTextureChurn = parseOnOff(parts, config.diagFakeTextureChurn);
+                player.sendTextMessage(TAG + " fake-render texture churn " + (config.diagFakeTextureChurn
+                        ? "ON — requires /mm terrain ON too (same gate). The map will stop showing real"
+                                + " terrain; every re-render is now just a dummy native texture"
+                                + " create+dispose cycle, no chunk reads at all."
+                        : "OFF — real terrain rendering restored")
+                        + ". NOT persisted — resets to off on restart/world switch.");
+            }
             case "teardown" -> {
                 if (parts.length > 2) {
                     String m = parts[2].toLowerCase();
@@ -1048,7 +1060,7 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
             case "version" -> {
                 player.sendTextMessage(TAG + " version " + PLUGIN_VERSION);
             }
-            default -> player.sendTextMessage(TAG + " usage: /mm [toggle|status|caps|dev|ids|perf|contour|blur|caves|cavemode|trees|fruitdebug|smooth|rotate|zoom|zoomkey|settings|waypoints|wpprivacy|spawn|players|hidden|terrain|mapdb|notex|hud|mapguard|safemode|uilite|minimal|teardown|hudgrace|diagreset|version]");
+            default -> player.sendTextMessage(TAG + " usage: /mm [toggle|status|caps|dev|ids|perf|contour|blur|caves|cavemode|trees|fruitdebug|smooth|rotate|zoom|zoomkey|settings|waypoints|wpprivacy|spawn|players|hidden|terrain|mapdb|notex|hud|mapguard|safemode|uilite|minimal|teardown|hudgrace|fakerender|diagreset|version]");
         }
     }
 

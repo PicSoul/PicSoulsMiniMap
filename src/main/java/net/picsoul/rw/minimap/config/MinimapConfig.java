@@ -399,6 +399,22 @@ public class MinimapConfig {
     public boolean minimalUi = false;
 
     /**
+     * Diagnostic (v2.79): isolates the render pipeline's native texture
+     * create/dispose churn from its chunk/world reads, while investigating the
+     * crash that {@code /mm terrain off} eliminates entirely. When true, every
+     * time the HUD would normally trigger a real map re-render (same
+     * movedFar/fillDue cadence), it instead only creates and immediately
+     * disposes a small dummy texture - zero {@code World}/{@code Chunk} calls,
+     * same texture-asset churn rate. If this alone crashes at the same ~8-12
+     * minute mark, the churn mechanism itself (AssetSalt + TextureAsset
+     * create/dispose, i.e. the game's own asset registry) is implicated,
+     * independent of chunk reads. If it runs indefinitely without crashing,
+     * the chunk/raw-terrain reads are implicated instead. Toggle
+     * {@code /mm fakerender}.
+     */
+    public boolean diagFakeTextureChurn = false;
+
+    /**
      * What the plugin does with its UI elements when it is unloaded (world switch).
      *
      * <p><b>Resolved:</b> calling {@code removeUIElement} while the plugin is being

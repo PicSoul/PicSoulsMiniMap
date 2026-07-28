@@ -528,16 +528,28 @@ public class MinimapHud {
         boolean needRender = !hasTexture || movedFar || fillDue;
 
         if (renderingEnabled && config.useTextures && needRender && !renderPending && pendingRevealIn == 0) {
-            renderPending = true;
-            final int ncx = (int) Math.round(worldX);
-            final int ncz = (int) Math.round(doubleZ);
-            if (caveMode) {
-                final int ncy = py;
-                renderer.renderCaveAsync(ncx, ncy, ncz, renderCells, outPx,
-                        (png, complete) -> onRenderDone(png, ncx, ncz, ncy, complete));
+            if (config.diagFakeTextureChurn) {
+                // Same "handled" bookkeeping a real render does (renderCenterX/Z,
+                // hasTexture, incompleteRegion), so this recurs at the same
+                // natural movedFar/fillDue cadence a real render would - the
+                // only difference is fakeChurnTick() never touches World/Chunk.
+                fakeChurnTick();
+                renderCenterX = (int) Math.round(worldX);
+                renderCenterZ = (int) Math.round(doubleZ);
+                hasTexture = true;
+                incompleteRegion = false;
             } else {
-                renderer.renderAsync(ncx, ncz, renderCells, outPx, prefs.contourEnabled,
-                        (png, complete) -> onRenderDone(png, ncx, ncz, Integer.MIN_VALUE, complete));
+                renderPending = true;
+                final int ncx = (int) Math.round(worldX);
+                final int ncz = (int) Math.round(doubleZ);
+                if (caveMode) {
+                    final int ncy = py;
+                    renderer.renderCaveAsync(ncx, ncy, ncz, renderCells, outPx,
+                            (png, complete) -> onRenderDone(png, ncx, ncz, ncy, complete));
+                } else {
+                    renderer.renderAsync(ncx, ncz, renderCells, outPx, prefs.contourEnabled,
+                            (png, complete) -> onRenderDone(png, ncx, ncz, Integer.MIN_VALUE, complete));
+                }
             }
         }
 
@@ -840,6 +852,24 @@ public class MinimapHud {
         else if (alpha > 1d) alpha = 1d;
         dispX = sPrevX + (sCurX - sPrevX) * alpha;
         dispZ = sPrevZ + (sCurZ - sPrevZ) * alpha;
+    }
+
+    /** Cached once so {@link #fakeChurnTick()} only pays the AssetSalt +
+     *  TextureAsset cost per call, not PNG generation too. */
+    private byte[] fakeChurnPng;
+
+    /** Diagnostic (v2.79, {@code config.diagFakeTextureChurn}): creates and
+     *  immediately disposes one native texture, at the same rate a real
+     *  render would happen, with zero {@code World}/{@code Chunk} calls -
+     *  isolates the render pipeline's texture-asset churn from its chunk
+     *  reads. See the field doc on {@code MinimapConfig#diagFakeTextureChurn}. */
+    private void fakeChurnTick() {
+        if (fakeChurnPng == null) {
+            fakeChurnPng = MarkerTexture.teardrop(8);
+        }
+        if (fakeChurnPng == null) return;
+        TextureAsset t = TextureAsset.load(AssetSalt.unique(fakeChurnPng));
+        disposeAsset(t);
     }
 
     private void onRenderDone(byte[] png, int ncx, int ncz, int ncy, boolean complete) {
