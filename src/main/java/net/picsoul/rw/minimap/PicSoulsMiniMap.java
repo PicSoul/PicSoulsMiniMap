@@ -58,7 +58,7 @@ import net.picsoul.rw.minimap.waypoint.WaypointService;
 
 public class PicSoulsMiniMap extends Plugin implements Listener {
 
-    public static final String PLUGIN_VERSION = "2.77";
+    public static final String PLUGIN_VERSION = "2.78";
     private static final String TAG = "[PicSoulsMiniMap]";
     /** Item type id of the vanilla map (confirmed from the game log: "map (59)"). */
     private static final short VANILLA_MAP_TYPE_ID = 59;
@@ -213,7 +213,26 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
         System.out.println(TAG + " Disabled.");
     }
 
+    /** Diagnostic (v2.78): logged once, first tick only. Investigating the
+     *  terrain-render-pipeline crash further: {@code Plugin.enqueue}/
+     *  {@code executeDelayed} are SDK-documented to always run on "the main
+     *  server thread (this is always the same thread)" - Timer, which drives
+     *  every tick() call (and therefore every chunk read and texture create
+     *  in the render pipeline), carries no such documented guarantee. If
+     *  Timer callbacks do NOT run on the main thread, every chunk/world read
+     *  this plugin has ever done has been racing the game's own main-thread
+     *  world access - which would explain a native, uncatchable crash with no
+     *  exception that needs several minutes of sustained activity to surface
+     *  (races are probabilistic, not deterministic) and disappears completely
+     *  when terrain rendering (the only thing that reads chunks) is off. */
+    private boolean threadCheckLogged = false;
+
     private void tick() {
+        if (!threadCheckLogged) {
+            threadCheckLogged = true;
+            System.out.println(TAG + "[diag] tick() running on main thread: " + isMainThread()
+                    + "  (thread=" + Thread.currentThread().getName() + ")");
+        }
         ticksSincePerf++;
         // World-load grace: don't touch chunks or Maps.db until the world has had a
         // few seconds to finish streaming in after a (re)enable / world switch.

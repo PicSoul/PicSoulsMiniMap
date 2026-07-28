@@ -1,6 +1,6 @@
 PicSouls MiniMap - Command List
 ================================
-Plugin version: 2.77
+Plugin version: 2.78
 
 All commands are typed in the in-game chat and start with either "/mm" or
 "/minimap" (the two are interchangeable). Commands are not case-sensitive.

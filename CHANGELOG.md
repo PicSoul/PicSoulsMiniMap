@@ -2293,3 +2293,36 @@ written.
   correlates with the crash timing instead.
   NOTE: wants the user's already-planned `/mm caves off` test, and another
   reproduction either way so the new heap numbers can be read.
+
+- **v2.78: diagnostic-only - check whether Timer callbacks run on the main
+  thread.** User ran the `/mm terrain off` bisection test (the sixth crash
+  investigation session): 20+ minutes of play, including fast Creative
+  flight that previously crashed reliably within ~9 minutes, with zero
+  crashes. This isolates the cause to the terrain render pipeline
+  specifically (chunk reads + the per-render texture create/dispose cycle) -
+  confirms it's not cave detection (already ruled out in v2.77) and not
+  anything in the always-on radar/waypoint/UI code, since all of that kept
+  running normally with terrain off.
+  Checked the SDK: `Plugin.enqueue()`/`executeDelayed()` are explicitly
+  documented to always run "from the main server thread (this is always the
+  same thread)" - `Timer`, which drives every `tick()` call (and therefore
+  every chunk read and texture create in the render pipeline, via
+  `MinimapHud.updateView` -> `MapRenderer.renderAsync` -> `TileCache.get` ->
+  `World.getChunk`/raw terrain reads), carries no such documented guarantee
+  anywhere in `Timer`'s javadoc. If `Timer` callbacks don't actually run on
+  the main thread, every chunk read this plugin has ever done has been
+  racing the game's own main-thread world access - which would explain a
+  native, uncatchable crash with no exception (a data race, not a Java
+  error) that needs several minutes of sustained activity to surface (races
+  are probabilistic) and vanishes completely when terrain rendering (the
+  only thing that reads chunks) is off. Exactly matches every observation
+  so far.
+  Added a one-time (first tick only) log line using the SDK's own
+  `Plugin.isMainThread()` check, logged from inside `tick()` itself, to
+  directly confirm or rule this out. No behavior change.
+  NOTE: this one doesn't need a crash to reproduce - just a few seconds of
+  play is enough to see the first `[diag] tick() running on main thread:
+  true/false` line. If it comes back false, that is very likely the actual
+  root cause and the real fix is routing the render-triggering tick work
+  through `enqueue()`/`executeDelayed()` instead of `Timer`, not a change to
+  any rendering logic itself.
