@@ -1,6 +1,6 @@
 # PicSouls MiniMap
 
-An Xaero-style minimap plugin for the Unity version of **Rising World**.
+A minimap plugin for the Unity version of **Rising World**.
 
 ## Features
 
