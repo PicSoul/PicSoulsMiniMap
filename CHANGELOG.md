@@ -2354,3 +2354,32 @@ written.
   NOTE: wants the user to run with `/mm terrain on` + `/mm fakerender on`
   together for at least 10-15 minutes (longer than any crash seen so far)
   to get a clean result either way.
+
+- **v2.80: diagnostic-only - add `/mm rawterrain` to isolate the bulk raw
+  chunk-buffer read.** `/mm fakerender` ran 23+ minutes (20 min normal play +
+  a few minutes of fast flight) with zero crashes, ruling out the
+  texture-asset churn/registry as the mechanism. By elimination (cave
+  detection, JVM heap, thread-safety, and now asset churn all ruled out, but
+  `/mm terrain off` - which disables reads AND churn together - does fix it),
+  the actual chunk/world data reads in `TileRenderer` are the last remaining
+  candidate. Within that, `Chunk.getRawLODTerrain()` - a bulk, explicitly
+  "raw" buffer read used for speed (avoids ~1024 individual
+  `getLODSurfaceTexture()` calls per tile) - is more suspect than the
+  per-cell fallback accessors the renderer already falls back to when the
+  raw read isn't available (a lower-level/less-validated API is generally
+  the more likely place for a native bug to live than a well-worn per-cell
+  accessor).
+  Added `config.diagForceNoRawTerrain` (`/mm rawterrain [on|off]`, not
+  persisted): "off" forces `TileRenderer.render` to skip
+  `getRawLODTerrain()` entirely and always use the slower per-cell
+  `getLODSurfaceTexture`/`getLODTerrain` path instead - real terrain still
+  renders normally, just through a different, presumably more heavily
+  validated API. If turning this off stops the crash, the raw bulk read is
+  implicated specifically (and the real fix becomes replacing it, accepting
+  the per-cell performance cost, or finding a safer way to call it). If it
+  still crashes, the bug is somewhere else in chunk access entirely
+  (possibly `World.getChunk()` itself, or `getLODTerrain()`, both still used
+  either way).
+  NOTE: wants the user to run with `/mm terrain on` + `/mm rawterrain off`
+  for at least 10-15 minutes, matching the same play style (including fast
+  flight) that has reliably crashed before.

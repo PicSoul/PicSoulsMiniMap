@@ -98,9 +98,11 @@ public final class TileRenderer {
         // was the cause of ~1s main-thread stalls when many tiles built at once.
         // Raw grid is 36x36 (2-cell border); surface texture is layer 0.
         byte[] raw = null;
-        try {
-            raw = chunk.getRawLODTerrain();
-        } catch (Throwable ignored) {
+        if (!cfg.diagForceNoRawTerrain) {
+            try {
+                raw = chunk.getRawLODTerrain();
+            } catch (Throwable ignored) {
+            }
         }
         final boolean useRaw = raw != null && raw.length >= Chunk.getRawTerrainIndex(0, SIZE + 3, SIZE + 3) + 1;
         if (useRaw && littleEndian == null) {

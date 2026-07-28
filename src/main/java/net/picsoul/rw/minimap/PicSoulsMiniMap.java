@@ -58,7 +58,7 @@ import net.picsoul.rw.minimap.waypoint.WaypointService;
 
 public class PicSoulsMiniMap extends Plugin implements Listener {
 
-    public static final String PLUGIN_VERSION = "2.79";
+    public static final String PLUGIN_VERSION = "2.80";
     private static final String TAG = "[PicSoulsMiniMap]";
     /** Item type id of the vanilla map (confirmed from the game log: "map (59)"). */
     private static final short VANILLA_MAP_TYPE_ID = 59;
@@ -954,6 +954,21 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
                         : "OFF — real terrain rendering restored")
                         + ". NOT persisted — resets to off on restart/world switch.");
             }
+            case "rawterrain" -> {
+                // Not persisted, same reasoning as /mm fakerender - a
+                // focused, one-session diagnostic test, not a lasting setting.
+                // "on" means normal (raw reads allowed); "off" forces the
+                // fallback - the inverse sense of the config field itself.
+                boolean rawOn = parseOnOff(parts, !config.diagForceNoRawTerrain);
+                config.diagForceNoRawTerrain = !rawOn;
+                tileCache.clear();
+                session.invalidateMap();
+                player.sendTextMessage(TAG + " raw terrain buffer reads " + (config.diagForceNoRawTerrain
+                        ? "OFF — forcing the slower per-cell getLODSurfaceTexture/getLODTerrain fallback"
+                                + " for every chunk, never the bulk getRawLODTerrain() read."
+                        : "ON — normal/default bulk raw-buffer read restored")
+                        + ". NOT persisted — resets to on (normal) on restart/world switch.");
+            }
             case "teardown" -> {
                 if (parts.length > 2) {
                     String m = parts[2].toLowerCase();
@@ -1060,7 +1075,7 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
             case "version" -> {
                 player.sendTextMessage(TAG + " version " + PLUGIN_VERSION);
             }
-            default -> player.sendTextMessage(TAG + " usage: /mm [toggle|status|caps|dev|ids|perf|contour|blur|caves|cavemode|trees|fruitdebug|smooth|rotate|zoom|zoomkey|settings|waypoints|wpprivacy|spawn|players|hidden|terrain|mapdb|notex|hud|mapguard|safemode|uilite|minimal|teardown|hudgrace|fakerender|diagreset|version]");
+            default -> player.sendTextMessage(TAG + " usage: /mm [toggle|status|caps|dev|ids|perf|contour|blur|caves|cavemode|trees|fruitdebug|smooth|rotate|zoom|zoomkey|settings|waypoints|wpprivacy|spawn|players|hidden|terrain|mapdb|notex|hud|mapguard|safemode|uilite|minimal|teardown|hudgrace|fakerender|rawterrain|diagreset|version]");
         }
     }
 

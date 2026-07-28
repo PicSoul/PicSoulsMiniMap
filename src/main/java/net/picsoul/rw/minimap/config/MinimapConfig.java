@@ -415,6 +415,24 @@ public class MinimapConfig {
     public boolean diagFakeTextureChurn = false;
 
     /**
+     * Diagnostic (v2.80): {@code /mm fakerender} (zero chunk reads, same
+     * texture-asset churn) ran 23+ minutes without crashing, ruling out the
+     * asset-registry churn as the mechanism - leaving the actual chunk/world
+     * data reads in {@link net.picsoul.rw.minimap.render.TileRenderer} as the
+     * last remaining candidate (since {@code /mm terrain off}, which disables
+     * both reads and churn together, does eliminate the crash). Within that,
+     * {@code Chunk.getRawLODTerrain()} - a bulk, explicitly "raw" (lower-level,
+     * presumably less-validated) buffer read - is more suspect than the
+     * per-cell {@code getLODSurfaceTexture}/{@code getLODTerrain} accessors
+     * TileRenderer already falls back to when the raw read isn't available.
+     * When true, forces that fallback path unconditionally, so the render
+     * pipeline still reads real chunk data (just never the raw bulk buffer),
+     * isolating whether the raw accessor specifically is implicated. Toggle
+     * {@code /mm rawterrain} (on = normal/default, off = force the fallback).
+     */
+    public boolean diagForceNoRawTerrain = false;
+
+    /**
      * What the plugin does with its UI elements when it is unloaded (world switch).
      *
      * <p><b>Resolved:</b> calling {@code removeUIElement} while the plugin is being
