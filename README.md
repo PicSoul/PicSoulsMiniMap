@@ -70,6 +70,10 @@ See [`CLAUDE.md`](CLAUDE.md) for the current architecture overview and
 [`RisingWorld_MiniMap_Design.md`](RisingWorld_MiniMap_Design.md) for the
 original design document.
 
+## License
+
+[MIT](LICENSE)
+
 ## Project layout
 
 ```
