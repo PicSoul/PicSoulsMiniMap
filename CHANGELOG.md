@@ -2243,3 +2243,39 @@ written.
     (rebind isolation, zoom isolation, `/mm zoomkey` scope, and hide-me
     actually hiding you from another client's map) need a second
     player/account to truly verify.
+
+- **v2.76: diagnostic-only - added cumulative session-total logging while
+  investigating a recurring native crash.** User reported the game crashing
+  repeatedly (four times in one play session) with no exception, error, or
+  Unity crash-dump ever appearing in `Player.log` - the same "silent, native,
+  uncatchable" signature as two previously-fixed crashes in this project (the
+  world-switch UI crash, the settings-panel rebuild crash), but neither of
+  those root causes applied here (no world switch, no settings changes). A
+  clean A/B test by the user (plugin disabled: no crash under the same play,
+  including fast Creative flight; plugin enabled: crashes) confirmed the
+  plugin is the cause. Closing background virtual-display software (Meta
+  Virtual Monitor / Virtual Desktop Monitor) did not stop it.
+  Crash timing across the four sessions clustered around 8-12 minutes in
+  regardless of activity (fast flying, slow walking, standing still
+  gardening) - a tighter pattern than instantaneous movement speed would
+  predict, and more consistent with a resource that accumulates over the
+  whole session. Leading theory: the number of distinct new terrain chunks
+  rendered, since `TileRenderer.render` does a bulk voxel read per chunk for
+  cave-opening detection (`caveDetectionEnabled`, on by default) - the one
+  part of the render path that reads meaningfully more native data than the
+  base terrain rendering that's been stable for a long time, and it runs on
+  every new chunk regardless of how fast the player is moving.
+  Per this project's established practice of adding instrumentation rather
+  than guessing a second time, added `TileCache.lifetimeRenders()` (a
+  never-reset lifetime counter of actual tile builds performed, distinct from
+  the existing `/mm perf` interval stats which reset every report) and an
+  always-on periodic log line (`[diag] session totals: uptimeSec=... tilesCached=...
+  lifetimeRenders=...`, every 20s, no `/mm perf` toggle needed) so that
+  whichever test reproduces the crash next, the log's last line before the
+  cutoff gives a concrete number to correlate against the four sessions
+  already on record. No behavior change; nothing about the crash is fixed by
+  this version.
+  NOTE: wants the user to (a) try `/mm caves off` as a quick, zero-code
+  bisection test of the cave-detection theory, and (b) reproduce the crash
+  again regardless, so the new log line's last value can be read and compared
+  across sessions.

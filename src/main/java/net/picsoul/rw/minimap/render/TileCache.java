@@ -78,6 +78,24 @@ public final class TileCache {
      *  "not loaded" is a fact about the chunk, independent of contour. */
     private final Map<Long, Long> misses = new java.util.HashMap<>();
 
+    /** Diagnostic (v2.76): lifetime count of actual tile renders performed this
+     *  session (never reset, unlike the interval-based /mm perf stats) - added
+     *  while investigating a native, uncatchable crash (no exception, no crash
+     *  dump) that reproduces reliably with the plugin enabled and not at all
+     *  with it disabled, across very different play styles (fast flying, slow
+     *  walking, standing still gardening), with crash timing clustering around
+     *  8-12 minutes into the session regardless of activity - suggesting a
+     *  cumulative resource (most likely how many distinct chunks have been
+     *  rendered, since {@code TileRenderer.render} does a bulk voxel read per
+     *  chunk for cave detection) rather than instantaneous movement speed.
+     *  Logged periodically from PicSoulsMiniMap.tick() so a crash's last log
+     *  line shows a concrete number to correlate across sessions. */
+    private long lifetimeRenders = 0;
+
+    public long lifetimeRenders() {
+        return lifetimeRenders;
+    }
+
     public TileCache(MinimapConfig config) {
         this.config = config;
     }
@@ -137,6 +155,7 @@ public final class TileCache {
         }
         int[] tile = TileRenderer.render(chunk, config, contourOn);
         if (tile != null) {
+            lifetimeRenders++;
             if (v == null) {
                 v = new Variants();
                 tiles.put(k, v);

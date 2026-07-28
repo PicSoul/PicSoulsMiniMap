@@ -58,7 +58,7 @@ import net.picsoul.rw.minimap.waypoint.WaypointService;
 
 public class PicSoulsMiniMap extends Plugin implements Listener {
 
-    public static final String PLUGIN_VERSION = "2.75";
+    public static final String PLUGIN_VERSION = "2.76";
     private static final String TAG = "[PicSoulsMiniMap]";
     /** Item type id of the vanilla map (confirmed from the game log: "map (59)"). */
     private static final short VANILLA_MAP_TYPE_ID = 59;
@@ -80,6 +80,16 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
     private float lastPerfLog = 0f;
     private int ticksSincePerf = 0;
     private static final float PERF_LOG_INTERVAL = 5f;
+
+    /** Diagnostic (v2.76): always-on (no /mm perf toggle needed) periodic log of
+     *  cumulative session totals - added while investigating a native, uncatchable
+     *  crash (no exception, no crash dump) confirmed via a clean A/B test to be
+     *  caused by this plugin, reproducing across very different play styles
+     *  (fast flying, slow walking, standing still) with crash timing clustering
+     *  around 8-12 minutes into the session regardless of activity. See
+     *  TileCache#lifetimeRenders for the leading theory. */
+    private float lastDiagLog = 0f;
+    private static final float DIAG_LOG_INTERVAL = 20f;
 
     private float lastCapsRefresh = 0f;
     private static final float CAPS_REFRESH_INTERVAL = 1f;
@@ -296,6 +306,17 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
                         hz, mapRenderer.intervalStatsAndReset(), tileCache.size()));
                 lastPerfLog = now;
                 ticksSincePerf = 0;
+            }
+        }
+        // Always-on (no toggle needed) so a crash's last log line shows these
+        // cumulative totals - see the field doc on lastDiagLog for why.
+        {
+            float now = getRunningTime();
+            if (now - lastDiagLog >= DIAG_LOG_INTERVAL) {
+                lastDiagLog = now;
+                System.out.println(String.format(
+                        TAG + "[diag] session totals: uptimeSec=%.0f tilesCached=%d lifetimeRenders=%d",
+                        now, tileCache.size(), tileCache.lifetimeRenders()));
             }
         }
         if (mapDirty) {
