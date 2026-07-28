@@ -1,6 +1,6 @@
 PicSouls MiniMap - Command List
 ================================
-Plugin version: 2.81
+Plugin version: 2.82
 
 All commands are typed in the in-game chat and start with either "/mm" or
 "/minimap" (the two are interchangeable). Commands are not case-sensitive.
@@ -317,6 +317,16 @@ DIAGNOSTICS
                   appears immediately. Raise it (e.g. "/mm hudgrace 25") if
                   switching worlds ever still crashes. Persists.
 
+/mm renderrate <perMinute>   Show or set the max number of REAL new-chunk map
+                  renders allowed per minute (default 20). Mitigation for a
+                  recurring native crash traced to the game's own chunk-reading
+                  API (World.getChunk/Chunk data calls) - a hard cap well below
+                  every observed crash rate, at the cost of the map filling in
+                  slower under heavy new-terrain load (e.g. fast flight).
+                  Lower is safer but laggier; raise it (e.g. "/mm renderrate 40")
+                  if 20 turns out to be more conservative than necessary.
+                  Persists.
+
 /mm diagreset     Restore ALL diagnostic switches at once: terrain, mapdb,
                   textures, hud, mapguard and safemode back ON, uilite and minimal
                   back OFF, and the world-switch delay back to 15s. The minimap is
@@ -330,7 +340,8 @@ Full command summary:
   /mm [toggle | status | caps | dev | ids | npcs | entities | perf | contour | blur | caves | cavemode |
        trees | radar | players | hidden | fruitdebug | smooth | rotate | zoom | zoomkey | settings |
        waypoints | wp | wpprivacy | spawn | terrain | mapdb | notex | hud | mapguard | safemode | uilite |
-       minimal | teardown | hudgrace | fakerender | rawterrain | fakechunk | diagreset | version]
+       minimal | teardown | hudgrace | renderrate | fakerender | rawterrain | fakechunk | diagreset |
+       version]
 
 Player settings (map size/corner, zoom keys/level, rotate, contour, waypoint
 privacy, players/hidden toggles) are now saved per player, in

@@ -2413,3 +2413,38 @@ written.
   NOTE: wants the user to run with `/mm terrain on` + `/mm fakechunk on`
   for at least 10-15 minutes, same play style as before including fast
   flight.
+
+- **v2.82: rate-limit real chunk renders - the actual mitigation for the
+  crash investigated across v2.76-v2.81.** `/mm fakechunk` ran clean (full
+  real tile-cache growth, real async encode, real texture creation, zero
+  `World`/`Chunk` calls) - conclusive, combined with everything else already
+  ruled out (cave detection, JVM heap, `Timer` thread-safety, texture-asset
+  churn, the raw vs. per-cell accessor choice): every path that calls into
+  the game's own chunk-reading API eventually crashes, and every path that
+  doesn't, never does, regardless of which specific accessor or how much
+  surrounding machinery runs. The crash timing tracks cumulative TIME spent
+  inside those native calls, not wall-clock session time or raw chunk count:
+  the default bulk-read path crashed around 700-850 renders over ~9 minutes
+  (~80-95/min), while the much slower per-cell fallback crashed around only
+  250-280 renders in just ~3.7 minutes (~68-75/min, each call costing far
+  more) - consistent with something inside the engine's own chunk API
+  proportional to how much it's been asked to do, not this plugin's code
+  (which tested clean at every other layer). Discussed with the user: since
+  the underlying engine behavior isn't something this plugin can fix
+  directly, the practical path is reducing exposure to it.
+  Added a fixed-window rate limiter in `TileCache.get()`
+  (`allowRealChunkRender`): caps real `World.getChunk`/`Chunk` calls to
+  `config.maxChunkRendersPerWindow` (default 20) per
+  `chunkRenderRateWindowSeconds` (60s) - roughly 4x below every observed
+  crash rate as a safety margin. A rate-limited chunk retries later via the
+  same "not loaded yet" cooldown path already used for ungenerated chunks
+  (`misses`), so the map still fills in progressively, just slower under
+  heavy new-terrain load (fast flight, boating into open ocean) than before.
+  Tunable live and persisted via `/mm renderrate <perMinute>`; shown in
+  `/mm status`.
+  NOTE: this is a mitigation (reduces how often the plugin exercises the
+  suspect game API), not a fix for the underlying engine behavior itself -
+  wants extended play (ideally including the specific patterns that
+  crashed before: sustained normal play past 9 minutes, and fast flight)
+  to confirm whether 20/min is actually low enough, too conservative, or
+  still not low enough.

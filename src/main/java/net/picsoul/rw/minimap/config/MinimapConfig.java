@@ -260,6 +260,35 @@ public class MinimapConfig {
      *  game hasn't generated yet (the open-ocean stall). */
     public float chunkRetryCooldown = 0.75f;
 
+    /**
+     * Mitigation (v2.82) for the recurring native, uncatchable crash
+     * investigated across v2.76-v2.81: elimination testing (cave detection,
+     * JVM heap, Timer thread-safety, texture-asset churn, the raw vs.
+     * per-cell terrain accessor, and finally a full-pipeline test with real
+     * caching/encoding/texture creation but zero {@code World}/{@code Chunk}
+     * calls) narrowed it to something inside the game's own chunk-reading API
+     * itself - not this plugin's caching, threading, or texture handling, all
+     * of which tested clean. The crash timing tracked cumulative TIME spent
+     * inside those native calls rather than wall-clock session time or raw
+     * chunk count: the default bulk-read path crashed around 700-850 renders
+     * over ~9 minutes (~80-95/min), while the much slower per-cell fallback
+     * path crashed around only 250-280 renders but in just ~3.7 minutes
+     * (~68-75/min, each call costing far more). Since the underlying engine
+     * behavior isn't something this plugin can fix directly, this caps how
+     * many REAL {@code World.getChunk}/{@code Chunk} calls happen per
+     * rolling window (see {@link net.picsoul.rw.minimap.render.TileCache
+     * #allowRealChunkRender}) - set well below every observed crash rate as
+     * a safety margin. A rate-limited chunk simply retries later (same
+     * "not loaded yet" cooldown path already used for ungenerated chunks),
+     * so the map still fills in progressively, just slower under heavy
+     * new-terrain load (e.g. fast flight) than before. Tune live with
+     * {@code /mm renderrate <perMinute>} - lower is safer but laggier;
+     * raise it if this turns out to be more conservative than necessary.
+     */
+    public int maxChunkRendersPerWindow = 20;
+    /** Rolling window (seconds) {@link #maxChunkRendersPerWindow} applies to. */
+    public float chunkRenderRateWindowSeconds = 60f;
+
     // ---- Smooth panning ----
     /** Interpolate the map's follow position between raw position samples, so the
      *  map glides even when the underlying player position updates slower than the

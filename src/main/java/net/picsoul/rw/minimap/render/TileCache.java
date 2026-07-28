@@ -78,6 +78,20 @@ public final class TileCache {
      *  "not loaded" is a fact about the chunk, independent of contour. */
     private final Map<Long, Long> misses = new java.util.HashMap<>();
 
+    /** Fixed-window rate limiter for real {@code World.getChunk}/{@code Chunk}
+     *  calls - see {@link MinimapConfig#maxChunkRendersPerWindow}. */
+    private long rateWindowStartNs = System.nanoTime();
+    private int rendersThisWindow = 0;
+
+    private boolean allowRealChunkRender(long nowNs) {
+        long windowNs = (long) (Math.max(1f, config.chunkRenderRateWindowSeconds) * 1_000_000_000.0);
+        if (nowNs - rateWindowStartNs > windowNs) {
+            rateWindowStartNs = nowNs;
+            rendersThisWindow = 0;
+        }
+        return rendersThisWindow < Math.max(1, config.maxChunkRendersPerWindow);
+    }
+
     /** Diagnostic (v2.76): lifetime count of actual tile renders performed this
      *  session (never reset, unlike the interval-based /mm perf stats) - added
      *  while investigating a native, uncatchable crash (no exception, no crash
@@ -155,6 +169,13 @@ public final class TileCache {
             // exactly as normal - see MinimapConfig#diagFakeChunkData.
             tile = fakeTile(cx, cz);
         } else {
+            if (!allowRealChunkRender(now)) {
+                // Rate-limited (see MinimapConfig#maxChunkRendersPerWindow) -
+                // treat like a "not ready" miss so this retries once the
+                // window has room again, rather than blocking outright.
+                misses.put(k, now);
+                return cached;
+            }
             Chunk chunk;
             try {
                 chunk = World.getChunk(cx, cz);
@@ -163,6 +184,7 @@ public final class TileCache {
                 return cached;
             }
             tile = TileRenderer.render(chunk, config, contourOn);
+            if (tile != null) rendersThisWindow++;
         }
         if (tile != null) {
             lifetimeRenders++;

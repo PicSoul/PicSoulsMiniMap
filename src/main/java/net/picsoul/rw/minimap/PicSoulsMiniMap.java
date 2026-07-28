@@ -58,7 +58,7 @@ import net.picsoul.rw.minimap.waypoint.WaypointService;
 
 public class PicSoulsMiniMap extends Plugin implements Listener {
 
-    public static final String PLUGIN_VERSION = "2.81";
+    public static final String PLUGIN_VERSION = "2.82";
     private static final String TAG = "[PicSoulsMiniMap]";
     /** Item type id of the vanilla map (confirmed from the game log: "map (59)"). */
     private static final short VANILLA_MAP_TYPE_ID = 59;
@@ -691,7 +691,9 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
                         + " minimal=" + (config.minimalUi ? "ON" : "OFF")
                         + " teardown=" + config.teardownMode
                         + " | worldSwitch=" + worldSwitch + " hudReady=" + hudReady
-                        + " hudgrace=" + config.hudGraceSeconds + "s");
+                        + " hudgrace=" + config.hudGraceSeconds + "s"
+                        + " renderrate=" + config.maxChunkRendersPerWindow + "/"
+                        + (int) config.chunkRenderRateWindowSeconds + "s");
                 player.sendTextMessage(TAG + " caves=" + (config.caveDetectionEnabled ? "ON" : "OFF")
                         + " cavemode=" + (config.caveModeEnabled ? "ON" : "OFF")
                         + " | currently in cave view=" + session.getHud().isCaveMode());
@@ -1035,6 +1037,21 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
                 player.sendTextMessage(TAG + " HUD world-switch delay = " + config.hudGraceSeconds
                         + "s (raise it if switching worlds still crashes; persists)");
             }
+            case "renderrate" -> {
+                if (parts.length > 2) {
+                    try {
+                        config.maxChunkRendersPerWindow = Math.max(1, Integer.parseInt(parts[2]));
+                        saveDiagnostics();
+                    } catch (NumberFormatException e) {
+                        player.sendTextMessage(TAG + " usage: /mm renderrate <perMinute>");
+                        break;
+                    }
+                }
+                player.sendTextMessage(TAG + " max real chunk renders = " + config.maxChunkRendersPerWindow
+                        + " per " + (int) config.chunkRenderRateWindowSeconds + "s (mitigation for the"
+                        + " native chunk-API crash - lower is safer but the map fills in slower under"
+                        + " heavy new-terrain load; persists)");
+            }
             case "diagreset" -> {
                 config.terrainRendering = true;
                 config.mapDbReads = true;
@@ -1087,7 +1104,7 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
             case "version" -> {
                 player.sendTextMessage(TAG + " version " + PLUGIN_VERSION);
             }
-            default -> player.sendTextMessage(TAG + " usage: /mm [toggle|status|caps|dev|ids|perf|contour|blur|caves|cavemode|trees|fruitdebug|smooth|rotate|zoom|zoomkey|settings|waypoints|wpprivacy|spawn|players|hidden|terrain|mapdb|notex|hud|mapguard|safemode|uilite|minimal|teardown|hudgrace|fakerender|rawterrain|fakechunk|diagreset|version]");
+            default -> player.sendTextMessage(TAG + " usage: /mm [toggle|status|caps|dev|ids|perf|contour|blur|caves|cavemode|trees|fruitdebug|smooth|rotate|zoom|zoomkey|settings|waypoints|wpprivacy|spawn|players|hidden|terrain|mapdb|notex|hud|mapguard|safemode|uilite|minimal|teardown|hudgrace|renderrate|fakerender|rawterrain|fakechunk|diagreset|version]");
         }
     }
 
@@ -1520,6 +1537,12 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
                         } catch (NumberFormatException ignored) {
                         }
                     }
+                    case "renderrate" -> {
+                        try {
+                            config.maxChunkRendersPerWindow = Math.max(1, Integer.parseInt(val));
+                        } catch (NumberFormatException ignored) {
+                        }
+                    }
                     default -> { }
                 }
             }
@@ -1544,6 +1567,7 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
             lines.add("uilite=" + (config.uiLite ? "on" : "off"));
             lines.add("minimal=" + (config.minimalUi ? "on" : "off"));
             lines.add("teardown=" + config.teardownMode);
+            lines.add("renderrate=" + config.maxChunkRendersPerWindow);
             Files.write(diagnosticsFile(), lines);
         } catch (Throwable t) {
             System.out.println(TAG + " could not save diagnostics.txt: " + t.getMessage());
