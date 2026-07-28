@@ -2156,3 +2156,17 @@ written.
   else. Worth specifically checking creative mode too, given that's exactly
   where F4 turned out to collide, and F1 is a common "help"/menu key in many
   games generally (not confirmed either way for Rising World specifically).
+
+- **v2.74: full set of custom radar icons added, covering every entity
+  species the radar can show.** No code changes - `icons/` grew from the
+  original 10 farm-animal PNGs to 60, adding wildlife (deer, moose, wolves,
+  foxes, bears, lions, elephants, rhinoceros, zebra, hare, penguin, etc.),
+  hostile npcs (bandit, barbarian, ghoul, skeleton, scorpion, spider, snake),
+  and the remaining farm-animal age/sex variants (calf, foal, goatling, etc.).
+  `MarkerOverlay.resolveRadarIcon`/`preloadRadarIcons` already load whatever
+  is present in `icons/` by npc name with no per-species registration needed,
+  so this is a pure asset addition.
+  NOTE: wants in-game confirmation — spot-check a few of the newly-added
+  species on the radar to confirm the file-name-to-npc-name mapping is
+  correct for each (a typo'd filename just silently falls back to the
+  default blip rather than erroring).

@@ -21,72 +21,72 @@ Check each box as you finish that file.
 
 
 -- Animal (id, name) --
-[ ] 65  arcticfox
-[ ] 67  arcticfoxcub
-[ ] 156 arcticshewolf        (hostile-capable)
-[ ] 155 arcticwolf           (hostile-capable)
-[ ] 80  bear                 (hostile-capable)
-[ ] 82  bearcub
-[ ] 81  bearmale             (hostile-capable)
-[ ] 21  billygoat
-[ ] 6   bull
-[ ] 7   calf
-[ ] 27  chick
-[ ] 25  chicken
-[ ] 5   cow
-[ ] 50  deer
-[ ] 52  deercalf
-[ ] 55  deerred
-[ ] 51  deerstag
-[ ] 35  earthworm
-[ ] 125 elephant
-[ ] 127 elephantcalf
-[ ] 160 firewolf             (hostile-capable)
-[ ] 102 foal
-[ ] 60  fox
-[ ] 62  foxcub
-[ ] 20  goat
-[ ] 22  goatling
-[ ] 30  hare
-[ ] 12  lamb
-[ ] 135 lion                 (hostile-capable)
-[ ] 136 lioness              (hostile-capable)
-[ ] 70  moose
-[ ] 71  moosebull
-[ ] 72  moosecalf
-[ ] 90  penguin
-[ ] 1   pig
-[ ] 3   piglet
-[ ] 2   pigmale
-[ ] 85  polarbear            (hostile-capable)
-[ ] 11  ram
-[ ] 14  ramshorn
-[ ] 130 rhinoceros
-[ ] 43  scorpion             (hostile-capable)
-[ ] 10  sheep
-[ ] 13  sheepshorn
-[ ] 151 shewolf              (hostile-capable)
-[ ] 40  snake                (hostile-capable)
-[ ] 45  spider                (hostile-capable)
-[ ] 76  wildboar             (hostile-capable)
-[ ] 77  wildpiglet
-[ ] 75  wildsow
-[ ] 150 wolf                 (hostile-capable)
-[ ] 152 wolfcub
-[ ] 120 zebra
+[X] 65  arcticfox
+[X] 67  arcticfoxcub
+[X] 156 arcticshewolf        (hostile-capable)
+[X] 155 arcticwolf           (hostile-capable)
+[X] 80  bear                 (hostile-capable)
+[X] 82  bearcub
+[X] 81  bearmale             (hostile-capable)
+[X] 21  billygoat
+[X] 6   bull
+[X] 7   calf
+[X] 27  chick
+[X] 25  chicken
+[X] 5   cow
+[X] 50  deer
+[X] 52  deercalf
+[X] 55  deerred
+[X] 51  deerstag
+[x] 35  earthworm
+[X] 125 elephant
+[X] 127 elephantcalf
+[X] 160 firewolf             (hostile-capable)
+[X] 102 foal
+[X] 60  fox
+[X] 62  foxcub
+[X] 20  goat
+[X] 22  goatling
+[X] 30  hare
+[X] 12  lamb
+[X] 135 lion                 (hostile-capable)
+[X] 136 lioness              (hostile-capable)
+[X] 70  moose
+[X] 71  moosebull
+[X] 72  moosecalf
+[X] 90  penguin
+[X] 1   pig
+[X] 3   piglet
+[X] 2   pigmale
+[X] 85  polarbear            (hostile-capable)
+[X] 11  ram                       
+[X] 14  ramshorn
+[X] 130 rhinoceros
+[X] 43  scorpion             (hostile-capable)
+[X] 10  sheep
+[X] 13  sheepshorn
+[X] 151 shewolf              (hostile-capable)
+[X] 40  snake                (hostile-capable)
+[X] 45  spider                (hostile-capable)
+[X] 76  wildboar             (hostile-capable)
+[X] 77  wildpiglet
+[X] 75  wildsow
+[X] 150 wolf                 (hostile-capable)
+[X] 152 wolfcub
+[X] 120 zebra
 
 -- Human (id, name) --
-[ ] 210 bandit               (hostile-capable)
-[ ] 215 barbarian            (hostile-capable)
-[ ] 200 dummy
-[ ] 230 ghoul                (hostile-capable)
+[X] 210 bandit               (hostile-capable)
+[X] 215 barbarian            (hostile-capable)
+[X] 200 dummy
+[X] 230 ghoul                (hostile-capable)
 
 -- Mount (id, name) --
-[ ] 100 horse                (saddle variant: horse_saddled.png)
-[ ] 101 stallion             (saddle variant: stallion_saddled.png)
+[X] 100 horse                (saddle variant: horse_saddled.png)
+[X] 101 stallion             (saddle variant: stallion_saddled.png)
 
 -- Skeleton (id, name) --
-[ ] 220 skeleton             (hostile-capable)
+[X] 220 skeleton             (hostile-capable)
 
 
 Notes / progress log:
