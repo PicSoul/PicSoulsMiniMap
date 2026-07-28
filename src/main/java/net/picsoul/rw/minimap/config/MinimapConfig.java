@@ -433,6 +433,27 @@ public class MinimapConfig {
     public boolean diagForceNoRawTerrain = false;
 
     /**
+     * Diagnostic (v2.81): {@code /mm rawterrain off} (forces the per-cell
+     * fallback, never the bulk raw buffer) still crashed - faster, in fact
+     * (~3.7 min vs. the usual ~8-12), with heavy main-thread spikes (18-35ms)
+     * right before it, during a burst of fast travel into new territory. That
+     * still doesn't isolate {@code Chunk.getLODTerrain()} (called in every
+     * scenario tested so far, raw or fallback) from the rest of the pipeline
+     * - and {@code /mm fakerender} never exercised the tile cache's real
+     * growth, the real async worker-thread PNG encode, or real full-size
+     * textures, since it bypasses {@link net.picsoul.rw.minimap.render.TileCache}
+     * entirely with a tiny synchronous dummy. When true,
+     * {@code TileCache.get} synthesizes a same-size tile touching NO
+     * World/Chunk API at all, while leaving the cache's real growth/eviction,
+     * MapRenderer's real async encode, and MinimapHud's real texture creation
+     * all exercised exactly as normal - the cleanest remaining split between
+     * "any chunk/world data access" and "everything else in this plugin's
+     * rendering machinery, at full realistic scale." Toggle
+     * {@code /mm fakechunk} (not persisted).
+     */
+    public boolean diagFakeChunkData = false;
+
+    /**
      * What the plugin does with its UI elements when it is unloaded (world switch).
      *
      * <p><b>Resolved:</b> calling {@code removeUIElement} while the plugin is being

@@ -1,6 +1,6 @@
 PicSouls MiniMap - Command List
 ================================
-Plugin version: 2.80
+Plugin version: 2.81
 
 All commands are typed in the in-game chat and start with either "/mm" or
 "/minimap" (the two are interchangeable). Commands are not case-sensitive.
@@ -278,6 +278,15 @@ DIAGNOSTICS
                   NOT persisted - always resets to on (normal) on restart/world
                   switch.
 
+/mm fakechunk [on|off]    Diagnostic. Replaces real terrain data with a solid
+                  placeholder color, skipping World.getChunk/Chunk data calls
+                  entirely - but the tile cache, async PNG encode, and texture
+                  creation all still run normally at full scale/rate. Used to
+                  isolate whether any chunk/world data access at all is behind
+                  a recurring native crash, vs. the surrounding rendering
+                  machinery. NOT persisted - always resets to off on
+                  restart/world switch.
+
 /mm teardown full|roots|none    Controls what the plugin does with its on-screen
                   elements when it unloads during a world switch. "full" (default)
                   removes everything; "roots" removes only the two main containers;
@@ -321,7 +330,7 @@ Full command summary:
   /mm [toggle | status | caps | dev | ids | npcs | entities | perf | contour | blur | caves | cavemode |
        trees | radar | players | hidden | fruitdebug | smooth | rotate | zoom | zoomkey | settings |
        waypoints | wp | wpprivacy | spawn | terrain | mapdb | notex | hud | mapguard | safemode | uilite |
-       minimal | teardown | hudgrace | fakerender | rawterrain | diagreset | version]
+       minimal | teardown | hudgrace | fakerender | rawterrain | fakechunk | diagreset | version]
 
 Player settings (map size/corner, zoom keys/level, rotate, contour, waypoint
 privacy, players/hidden toggles) are now saved per player, in

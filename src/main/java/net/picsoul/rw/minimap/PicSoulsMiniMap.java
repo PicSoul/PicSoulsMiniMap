@@ -58,7 +58,7 @@ import net.picsoul.rw.minimap.waypoint.WaypointService;
 
 public class PicSoulsMiniMap extends Plugin implements Listener {
 
-    public static final String PLUGIN_VERSION = "2.80";
+    public static final String PLUGIN_VERSION = "2.81";
     private static final String TAG = "[PicSoulsMiniMap]";
     /** Item type id of the vanilla map (confirmed from the game log: "map (59)"). */
     private static final short VANILLA_MAP_TYPE_ID = 59;
@@ -969,6 +969,18 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
                         : "ON — normal/default bulk raw-buffer read restored")
                         + ". NOT persisted — resets to on (normal) on restart/world switch.");
             }
+            case "fakechunk" -> {
+                // Not persisted, same reasoning as /mm fakerender/rawterrain.
+                config.diagFakeChunkData = parseOnOff(parts, config.diagFakeChunkData);
+                tileCache.clear();
+                session.invalidateMap();
+                player.sendTextMessage(TAG + " fake chunk data " + (config.diagFakeChunkData
+                        ? "ON — the map will show a solid placeholder color instead of real terrain, but"
+                                + " the tile cache, async encode, and texture creation all still run"
+                                + " normally at full scale; only World/Chunk API calls are skipped."
+                        : "OFF — real terrain data restored")
+                        + ". NOT persisted — resets to off on restart/world switch.");
+            }
             case "teardown" -> {
                 if (parts.length > 2) {
                     String m = parts[2].toLowerCase();
@@ -1075,7 +1087,7 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
             case "version" -> {
                 player.sendTextMessage(TAG + " version " + PLUGIN_VERSION);
             }
-            default -> player.sendTextMessage(TAG + " usage: /mm [toggle|status|caps|dev|ids|perf|contour|blur|caves|cavemode|trees|fruitdebug|smooth|rotate|zoom|zoomkey|settings|waypoints|wpprivacy|spawn|players|hidden|terrain|mapdb|notex|hud|mapguard|safemode|uilite|minimal|teardown|hudgrace|fakerender|rawterrain|diagreset|version]");
+            default -> player.sendTextMessage(TAG + " usage: /mm [toggle|status|caps|dev|ids|perf|contour|blur|caves|cavemode|trees|fruitdebug|smooth|rotate|zoom|zoomkey|settings|waypoints|wpprivacy|spawn|players|hidden|terrain|mapdb|notex|hud|mapguard|safemode|uilite|minimal|teardown|hudgrace|fakerender|rawterrain|fakechunk|diagreset|version]");
         }
     }
 

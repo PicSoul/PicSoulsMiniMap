@@ -2383,3 +2383,33 @@ written.
   NOTE: wants the user to run with `/mm terrain on` + `/mm rawterrain off`
   for at least 10-15 minutes, matching the same play style (including fast
   flight) that has reliably crashed before.
+
+- **v2.81: diagnostic-only - add `/mm fakechunk`, the cleanest remaining
+  split between "any chunk/world API access" and the rest of the render
+  pipeline.** `/mm rawterrain off` still crashed - faster, in fact (~3.7 min
+  vs. the usual ~8-12), during a burst of fast travel into new territory,
+  with main-thread frame times spiking to 18-35ms right before it (the
+  per-cell fallback path is much heavier per chunk than the bulk raw read,
+  by design - that's why the raw path was added originally). That result
+  doesn't isolate `Chunk.getLODTerrain()` specifically, since it's called in
+  every scenario tested so far regardless of the raw/fallback choice - and
+  re-examining `/mm fakerender`'s v2.79 result found a real gap: it bypasses
+  `TileCache`, `MapRenderer`'s real async worker-thread PNG encode, and
+  real full-size textures entirely with a tiny synchronous dummy, so a clean
+  23-minute run there doesn't actually rule out something in that
+  surrounding machinery at realistic scale (cache growth to hundreds of
+  entries, the async encode step, full-size texture churn) - only that a
+  trivial, bypassed-everything create/dispose cycle is safe.
+  Added `config.diagFakeChunkData` (`/mm fakechunk [on|off]`, not
+  persisted): `TileCache.get` synthesizes a same-size placeholder tile with
+  zero `World`/`Chunk` calls, while leaving its own real cache growth/
+  eviction, `MapRenderer`'s real async encode, and `MinimapHud`'s real
+  texture creation exercised exactly as normal. If this runs clean, every
+  chunk/world data access is implicated as a group (regardless of which
+  specific accessor) and the fix path is architectural (throttle/reduce how
+  much real chunk data gets read, e.g. a harder cap on renders per minute).
+  If it still crashes, the bug is in this plugin's own surrounding
+  rendering/caching machinery instead, not the game's chunk API at all.
+  NOTE: wants the user to run with `/mm terrain on` + `/mm fakechunk on`
+  for at least 10-15 minutes, same play style as before including fast
+  flight.

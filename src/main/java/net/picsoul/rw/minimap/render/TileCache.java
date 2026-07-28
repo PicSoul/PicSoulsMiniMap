@@ -146,14 +146,24 @@ public final class TileCache {
             return cached; // still cooling down -- serve the stale tile if we have one
         }
 
-        Chunk chunk;
-        try {
-            chunk = World.getChunk(cx, cz);
-        } catch (Exception e) {
-            misses.put(k, now);
-            return cached;
+        int[] tile;
+        if (config.diagFakeChunkData) {
+            // Diagnostic (v2.81): synthesize a same-size tile with zero
+            // World/Chunk API calls, while leaving everything downstream (this
+            // cache's real growth/eviction, MapRenderer's real async encode,
+            // MinimapHud's real full-size TextureAsset creation) exercised
+            // exactly as normal - see MinimapConfig#diagFakeChunkData.
+            tile = fakeTile(cx, cz);
+        } else {
+            Chunk chunk;
+            try {
+                chunk = World.getChunk(cx, cz);
+            } catch (Exception e) {
+                misses.put(k, now);
+                return cached;
+            }
+            tile = TileRenderer.render(chunk, config, contourOn);
         }
-        int[] tile = TileRenderer.render(chunk, config, contourOn);
         if (tile != null) {
             lifetimeRenders++;
             if (v == null) {
@@ -167,6 +177,16 @@ public final class TileCache {
         }
         misses.put(k, now);
         return cached;
+    }
+
+    /** Diagnostic (v2.81): a same-size ({@code TileRenderer.SIZE}^2) synthetic
+     *  tile, deterministic per chunk coordinate but touching no World/Chunk
+     *  API at all - see {@link MinimapConfig#diagFakeChunkData}. */
+    private static int[] fakeTile(int cx, int cz) {
+        int size = TileRenderer.SIZE;
+        int[] tile = new int[size * size];
+        java.util.Arrays.fill(tile, 0xFF3A6B35); // fixed solid color - content is irrelevant to this test
+        return tile;
     }
 
     /**
