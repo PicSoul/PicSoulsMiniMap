@@ -58,7 +58,7 @@ import net.picsoul.rw.minimap.waypoint.WaypointService;
 
 public class PicSoulsMiniMap extends Plugin implements Listener {
 
-    public static final String PLUGIN_VERSION = "2.82";
+    public static final String PLUGIN_VERSION = "2.83";
     private static final String TAG = "[PicSoulsMiniMap]";
     /** Item type id of the vanilla map (confirmed from the game log: "map (59)"). */
     private static final short VANILLA_MAP_TYPE_ID = 59;

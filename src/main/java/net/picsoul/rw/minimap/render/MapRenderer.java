@@ -50,6 +50,14 @@ public final class MapRenderer {
         this.worker = worker;
     }
 
+    /** Lifetime count of actual tile builds performed so far (see
+     *  {@link TileCache#lifetimeRenders()}) - lets a caller tell whether any
+     *  genuinely new tile data has appeared since a previous check, e.g. to
+     *  avoid a pointless re-encode/re-render when nothing has changed. */
+    public long lifetimeRenders() {
+        return cache.lifetimeRenders();
+    }
+
     /** Immutable grid of tiles covering a render region; safe to read off-thread. */
     private static final class Snapshot {
         final int minCx, minCz, cols;

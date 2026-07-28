@@ -79,6 +79,9 @@ public class MinimapHud {
     private boolean renderPending = false;
     private boolean incompleteRegion = false;
     private long nextFillRetryNs = 0;
+    /** {@code renderer.lifetimeRenders()} as of the last fill-retry attempt -
+     *  see the v2.83 fix note above {@code fillDue} in updateView(). */
+    private long incompleteAtRenderCount = -1;
     private static final long FILL_RETRY_NS = 400_000_000L;
     private static final int REVEAL_DELAY_TICKS = 3;
     private int pendingRevealIn = 0;
@@ -524,7 +527,28 @@ public class MinimapHud {
         // The real cause was duplicate asset names; see AssetSalt.) Without this,
         // chunks that stream in after you stop are missing from the map until you
         // move, which looked bad.
+        //
+        // v2.83: this used to fire unconditionally every FILL_RETRY_NS (400ms)
+        // whenever incomplete, re-encoding and creating a brand-new texture
+        // even when NOTHING new had actually become available since the last
+        // attempt — under the v2.82 chunk-render rate limiter (which
+        // deliberately holds back new tiles), regions stay incomplete far
+        // more of the time, so this was firing near-continuously: one live
+        // session logged 915 texture creates in ~7 minutes, only 140 of
+        // which were real chunk renders — the other 430+ were wasted,
+        // near-blank re-encodes of unchanged data (visible as the map
+        // looking blank a lot). Now only actually retries once
+        // MapRenderer.lifetimeRenders() has moved since the last attempt;
+        // otherwise it just pushes the retry window out again for free.
         boolean fillDue = incompleteRegion && System.nanoTime() >= nextFillRetryNs;
+        // Cave mode never touches the surface TileCache (renderCaveAsync reads
+        // fresh every call, no cache - see MapRenderer#renderCaveAsync's own
+        // doc), so lifetimeRenders() would never move during cave viewing;
+        // only apply the skip-if-unchanged check to the surface path.
+        if (fillDue && !caveMode && renderer.lifetimeRenders() == incompleteAtRenderCount) {
+            fillDue = false;
+            nextFillRetryNs = System.nanoTime() + FILL_RETRY_NS;
+        }
         boolean needRender = !hasTexture || movedFar || fillDue;
 
         if (renderingEnabled && config.useTextures && needRender && !renderPending && pendingRevealIn == 0) {
@@ -877,6 +901,7 @@ public class MinimapHud {
         incompleteRegion = !complete;
         if (!complete) {
             nextFillRetryNs = System.nanoTime() + FILL_RETRY_NS;
+            incompleteAtRenderCount = renderer.lifetimeRenders();
         }
         if (!built || png == null) return;
 

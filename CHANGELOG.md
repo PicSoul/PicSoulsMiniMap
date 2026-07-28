@@ -2448,3 +2448,48 @@ written.
   crashed before: sustained normal play past 9 minutes, and fast flight)
   to confirm whether 20/min is actually low enough, too conservative, or
   still not low enough.
+
+- **v2.83: found and fixed a real bug - the fill-retry loop was re-encoding
+  and recreating a texture every 400ms regardless of whether anything had
+  actually changed, and the v2.82 rate limiter made this dramatically
+  worse.** User reported the crash still happened at 20 renders/min, and
+  separately that the map looked blank a lot - and asked (correctly) whether
+  the plugin caches tiles the way other games' minimaps typically do, since
+  that seemed like the obvious way to cut down on repeated work.
+  Checked the log for that session and found the real problem: 915 total
+  texture creations in ~7 minutes, but only 140 were real chunk renders
+  (matching the 20/min limiter working exactly as designed) - the other
+  430+ were tiny, near-blank 905-byte placeholder images, one for each of
+  170 "map region incomplete, filling in progressively" retries.
+  `MinimapHud.updateView()`'s fill-retry logic (added in v2.20 for a good
+  reason - filling in chunks that stream in after you stop moving) fires
+  unconditionally every `FILL_RETRY_NS` (400ms) whenever the last snapshot
+  was incomplete, with no check for whether any actual progress had been
+  made since the previous attempt - it always re-encodes and creates a
+  brand-new texture via `onRenderDone`, even if the region is exactly as
+  incomplete as it was 400ms ago. The v2.82 rate limiter, by deliberately
+  holding back new real tiles, made regions stay incomplete far more of the
+  time than before - so instead of reducing texture churn, it drove this
+  unrelated retry-storm bug much harder (~130 creates/min, worse than any
+  unthrottled session). This also retroactively explains every earlier
+  crash without needing an unfixable engine explanation: fast movement or a
+  slow chunk read both mean more time spent "incomplete," which means more
+  of this same wasteful churn, regardless of which chunk-data accessor was
+  in use.
+  Fixed: `MinimapHud` now tracks `MapRenderer.lifetimeRenders()` (new
+  pass-through to `TileCache#lifetimeRenders`) at the moment a fill-retry is
+  scheduled, and only actually retries once that count has moved - i.e.
+  once some genuinely new tile has become available - otherwise it just
+  pushes the retry window out again for free, no wasted encode/texture
+  cycle. Deliberately scoped to the surface path only (guarded by
+  `!caveMode`): `renderCaveAsync` never touches the surface `TileCache` at
+  all (fresh read every call, no cache), so `lifetimeRenders()` would never
+  move during cave viewing and would otherwise wedge cave mode's own
+  fill-retry permanently.
+  NOTE: wants the user to test with the v2.82 rate limiter effectively
+  disabled this time (`/mm renderrate 999`) to isolate this fix's effect
+  cleanly - if this alone stops the crash with no artificial throttle
+  needed, it was a real, complete fix rather than a mitigation for an
+  unfixable engine issue, and the render-rate limiter may turn out to be
+  unnecessary. If it still crashes, re-enable a conservative renderrate
+  alongside this fix.
