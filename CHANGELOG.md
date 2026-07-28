@@ -2279,3 +2279,17 @@ written.
   bisection test of the cave-detection theory, and (b) reproduce the crash
   again regardless, so the new log line's last value can be read and compared
   across sessions.
+
+- **v2.77: diagnostic-only - added JVM heap usage to the session-totals log.**
+  A fifth crash (v2.76 jar, cave detection still on) gave real data from the
+  v2.76 counter: `lifetimeRenders` climbed linearly the whole session and was
+  actually *slowing down* in the last couple of 20s windows before the crash
+  (33 -> 18 -> 1 new renders), not spiking - ruling out a simple tile-render-
+  count ceiling or runaway churn as the mechanism. Crash timing was ~9 minutes
+  in, again in the same 8-12 minute band regardless of activity, and only
+  this plugin was loaded (no AdminControl this run), ruling out a plugin-
+  plugin interaction too. Added `Runtime.getRuntime()` heap used/max (MB) to
+  the same periodic `[diag]` log line, to see whether a Java-side memory leak
+  correlates with the crash timing instead.
+  NOTE: wants the user's already-planned `/mm caves off` test, and another
+  reproduction either way so the new heap numbers can be read.
