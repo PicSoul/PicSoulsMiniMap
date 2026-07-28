@@ -2517,3 +2517,36 @@ written.
   with rotate-with-heading turned ON (not just the north-up default), that
   would point at something else (possibly an SDK-specific rotate() quirk)
   not covered by this fix.
+
+- **v2.85: prioritize edited chunks within the render-rate budget, and raise
+  the default rate.** User reported two responsiveness issues at the v2.82
+  rate limiter's default (tree canopy blobs updating late, and a visible
+  cutoff/seam where one chunk had refreshed but its neighbor hadn't - the
+  cross-chunk border blending TileRenderer relies on only looks right when
+  neighboring tiles come from a consistent moment, which throttling makes
+  much less likely) - then tested 40, 60, 80, and 120 renders/min with the
+  v2.83 fill-retry fix in place: **none crashed**, though the map was still
+  noticeably restricted/delayed even at 120.
+  This is genuinely good news for stability (the only unthrottled test,
+  v2.83, DID eventually crash once around 1055 renders/~14 minutes - so the
+  rate limiter is doing real work, just possibly at an unnecessarily low
+  default) and pinpoints the tree-delay complaint precisely:
+  `MapRenderer.snapshot()`'s missing-chunk list was sorted by distance to
+  center alone, so a dirty (edited) chunk - already-cached, just needing a
+  refresh - competed on equal footing for the same limited per-minute
+  budget as brand-new, never-before-seen terrain far away. At a low rate,
+  unrelated exploration could keep winning that budget indefinitely while a
+  nearby edit sat stale.
+  Fixed: the sort now puts every dirty chunk first (regardless of distance),
+  then sorts the rest by distance as before - an edit near the player
+  should now resolve almost immediately regardless of how much unexplored
+  land is also queued, which should also shrink how long a boundary seam
+  is visible after an edit (though the underlying "neighbors can be
+  momentarily out of sync" property isn't eliminated, just made much
+  shorter-lived). Also raised `maxChunkRendersPerWindow`'s default from 20
+  to 60 - a middle ground between what felt too restrictive and the one
+  rate (unlimited) that did eventually crash; not proven-safe, just the
+  best empirical balance from testing so far.
+  NOTE: wants confirmation that edits (tree blobs specifically) now update
+  noticeably faster, and that the boundary-seam issue is less visible/
+  shorter-lived than before, at the new 60/min default.

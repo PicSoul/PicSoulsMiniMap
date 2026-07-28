@@ -123,10 +123,25 @@ public final class MapRenderer {
             }
         }
 
-        // Pass 2: build missing chunks nearest-to-center first, within a budget.
+        // Pass 2: build missing chunks, dirty (edited) ones first regardless of
+        // distance, then nearest-to-center among the rest, within a budget.
+        //
+        // v2.85: previously sorted by distance alone, so a dirty chunk (e.g. a
+        // tree just got added/removed near your base) competed on equal
+        // footing with newly-explored, never-before-seen terrain far away for
+        // the same rate-limited budget (see TileCache#maxChunkRendersPerWindow)
+        // - at a low enough rate, an edit could sit stale for a long time
+        // simply because unrelated exploration kept winning the budget first.
+        // A dirty chunk already has a real prior render (this is a refresh,
+        // not first-time discovery), so it's cheap to prioritize and matters
+        // more for perceived responsiveness than filling in distant unexplored
+        // land a little sooner.
         boolean complete = true;
         if (!missing.isEmpty()) {
             missing.sort((a, b) -> {
+                boolean aDirty = cache.isDirty(minCx + a[0], minCz + a[1], contourOn);
+                boolean bDirty = cache.isDirty(minCx + b[0], minCz + b[1], contourOn);
+                if (aDirty != bDirty) return aDirty ? -1 : 1;
                 long da = dist2(minCx + a[0], minCz + a[1], ccx, ccz);
                 long db = dist2(minCx + b[0], minCz + b[1], ccx, ccz);
                 return Long.compare(da, db);

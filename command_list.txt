@@ -1,6 +1,6 @@
 PicSouls MiniMap - Command List
 ================================
-Plugin version: 2.84
+Plugin version: 2.85
 
 All commands are typed in the in-game chat and start with either "/mm" or
 "/minimap" (the two are interchangeable). Commands are not case-sensitive.
@@ -318,14 +318,15 @@ DIAGNOSTICS
                   switching worlds ever still crashes. Persists.
 
 /mm renderrate <perMinute>   Show or set the max number of REAL new-chunk map
-                  renders allowed per minute (default 20). Mitigation for a
+                  renders allowed per minute (default 60). Mitigation for a
                   recurring native crash traced to the game's own chunk-reading
-                  API (World.getChunk/Chunk data calls) - a hard cap well below
-                  every observed crash rate, at the cost of the map filling in
-                  slower under heavy new-terrain load (e.g. fast flight).
-                  Lower is safer but laggier; raise it (e.g. "/mm renderrate 40")
-                  if 20 turns out to be more conservative than necessary.
-                  Persists.
+                  API (World.getChunk/Chunk data calls) - dirty (edited) chunks
+                  always get priority within this budget over newly-explored
+                  land, so edits near you (e.g. a tree changing) refresh well
+                  before distant unexplored terrain does. Lower is safer but
+                  the map fills in slower under heavy new-terrain load (e.g.
+                  fast flight); raise it (e.g. "/mm renderrate 120") if 60
+                  feels too restrictive. Persists.
 
 /mm diagreset     Restore ALL diagnostic switches at once: terrain, mapdb,
                   textures, hud, mapguard and safemode back ON, uilite and minimal

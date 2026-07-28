@@ -284,8 +284,22 @@ public class MinimapConfig {
      * new-terrain load (e.g. fast flight) than before. Tune live with
      * {@code /mm renderrate <perMinute>} - lower is safer but laggier;
      * raise it if this turns out to be more conservative than necessary.
+     *
+     * <p>v2.83 found and fixed a real, independent bug in the fill-retry
+     * loop that was wasting the vast majority of the render budget on
+     * pointless re-encodes (see MinimapHud's v2.83 fix note) - but even with
+     * that fixed, an unthrottled session (v2.83, this field effectively
+     * disabled) still crashed once, around 1055 real renders over ~14
+     * minutes (~75/min average). The user then tested 40, 60, 80, and 120/
+     * min with the fix in place - none crashed, though noticeable
+     * delay/staleness remained even at 120 (a direct, expected cost of
+     * throttling). 60 is a middle-ground default: comfortably above every
+     * value that felt too restrictive, comfortably below the one
+     * unthrottled rate that did eventually crash. Not a proven-safe number,
+     * just the best empirical balance so far - keep tuning with
+     * {@code /mm renderrate} as more data comes in.
      */
-    public int maxChunkRendersPerWindow = 20;
+    public int maxChunkRendersPerWindow = 60;
     /** Rolling window (seconds) {@link #maxChunkRendersPerWindow} applies to. */
     public float chunkRenderRateWindowSeconds = 60f;
 
