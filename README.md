@@ -36,18 +36,20 @@ development history.
 
 ## Install (players / server owners)
 
-1. Download `PicSoulsMiniMap.jar` from the [Releases](../../releases) page.
-2. Copy it into a folder named after the plugin under the game's `Plugins`
-   directory:
+1. Download the `PicSoulsMiniMap-vX.XX.zip` from the [Releases](../../releases)
+   page. It contains the plugin jar and the built-in custom radar icons.
+2. Extract the `PicSoulsMiniMap` folder from the zip straight into the game's
+   `Plugins` directory, so you end up with:
    ```
    <Rising World install>/Plugins/PicSoulsMiniMap/PicSoulsMiniMap.jar
+   <Rising World install>/Plugins/PicSoulsMiniMap/icons/*.png
    ```
 3. Start (or restart) the game with plugins enabled.
 4. Equip a map — the minimap should appear. See `command_list.txt` for every
    other tier/command.
 
-Custom radar icons (optional): drop PNG files named after the npc (see
-`/mm npcs` in-game for the full list of internal names) into
+More custom radar icons can be added any time: drop PNG files named after the
+npc (see `/mm npcs` in-game for the full list of internal names) into
 `Plugins/PicSoulsMiniMap/icons/`, e.g. `cow.png`. No restart needed if the
 species hasn't been seen yet this session.
 
