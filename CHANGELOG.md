@@ -2170,3 +2170,76 @@ written.
   species on the radar to confirm the file-name-to-npc-name mapping is
   correct for each (a typo'd filename just silently falls back to the
   default blip rather than erroring).
+
+- **v2.75: real per-player settings, replacing the single shared config, plus
+  a new "hide me from others" privacy toggle.** User asked how to let a player
+  opt out of appearing on other players' minimaps, and wanted it as a
+  settings-panel toggle - turned out that feature didn't exist at all yet
+  (`/mm players` only controls whether *you* see others, not whether others
+  see *you*). Investigating turned up a deeper problem: `MinimapConfig` was a
+  single object shared by the whole server, so map size, corner, rotate,
+  contour, zoom, zoom keybinds, waypoint privacy and the other-players toggle
+  were all actually server-wide, not personal - confirmed three real bugs this
+  caused: one player's key rebind or `/mm zoomkey` silently rebound *every*
+  connected player's zoom keys, and simultaneous zoom changes stomped each
+  other in the shared field.
+  - New `config.PlayerPreferences`: one instance per connected player, holding
+    exactly the fields that should be personal (`waypointPrivacy`,
+    `defaultZoomCells`, `zoomInKeyName`, `zoomOutKeyName`, `minimapSizePx`,
+    `corner`, `rotate`, `contourEnabled`, `showOtherPlayers`, and the new
+    `hiddenFromOthers`), with the same key=value load/save format the old
+    settings.txt used. `MinimapConfig` no longer owns any of these fields -
+    everything else in it (rendering thresholds/colors, capability item
+    names, diagnostics.txt toggles) stays shared/global, since those were
+    never per-player exposed in the first place.
+  - Storage: one file per player, `players/<uid>.txt`, keyed by
+    `Player.getUID()` (confirmed via the SDK: globally unique, never changes
+    across reconnects or servers - unlike `getID()`, which is per-connection
+    and was the wrong key). Migration: a player's first-ever connect after
+    this upgrade seeds their new file from the old shared `settings.txt` if it
+    exists (instead of resetting to hardcoded defaults), so existing tuning
+    isn't silently lost; `settings.txt` itself is left in place, untouched,
+    no longer written to.
+  - `PlayerSession`/`MinimapHud`/`SettingsPanel`/`MarkerOverlay` now take a
+    `PlayerPreferences` alongside the shared `MinimapConfig`, and every
+    settings-panel control + `/mm` command that used to mutate `config`
+    directly (wpprivacy, zoom, zoomkey, rotate, contour, players, map
+    size/corner, reset-to-defaults) now mutates that player's own prefs and
+    saves only their own file. `/mm zoomkey` in particular now only re-registers
+    the calling player's own hotkey, instead of looping over every connected
+    session - the actual fix for the cross-player rebind bug above.
+  - New `/mm hidden [on|off]` command and a matching settings-panel toggle
+    ("Hide me from others", next to rotate/contour): sets the calling
+    player's own `hiddenFromOthers`. `MinimapHud.gatherOtherPlayers()` now
+    skips any candidate player whose own session has this flag set (looked up
+    via a `SessionRegistry` reference threaded into `MinimapHud`), so a hidden
+    player is filtered out of every other viewer's other-players overlay.
+  - Contour lines needed special handling: they're baked per-cell into
+    `TileRenderer`'s output, cached in the single shared `TileCache` - not
+    read live by the HUD - so a naive per-player flag would either need a
+    full second tile cache (expensive) or a live per-frame overlay pass
+    (recomputes on every view change for every player; risks the existing
+    `snapshotBudgetMs` main-thread budget this plugin already has to guard).
+    Discussed the cost tradeoff with the user and landed on a middle path:
+    `TileCache` now stores up to *two* rendered variants per chunk
+    (contour-on / contour-off, via a new `Variants` holder with independent
+    per-variant dirty flags), and each viewer's own `contourEnabled`
+    preference picks which variant their render asks for
+    (`TileRenderer.render(chunk, config, contourOn)`,
+    `MapRenderer.renderAsync(..., contourOn, ...)`). Cost scales with distinct
+    chunks visited x distinct preferences actually in use, not player count or
+    frame rate - free if everyone shares one preference, bounded otherwise.
+    Side benefit: toggling contour no longer calls `tileCache.clear()` (which
+    used to wipe the *entire shared cache* for every player on a single
+    player's toggle) - flipping your own preference just means your own next
+    render asks for the other already-independently-cached variant.
+  - NOTE: wants in-game confirmation, ideally with a second connected
+    player/account since most of this is only observable with 2+
+    simultaneous players - solo testing can at least confirm: an existing
+    `settings.txt` correctly seeds a new `players/<uid>.txt` on first load
+    post-upgrade (no reset to defaults), the settings panel's new "Hide me
+    from others" toggle works and persists across a world switch, and normal
+    single-player operation is otherwise unaffected. The cross-player fixes
+    (rebind isolation, zoom isolation, `/mm zoomkey` scope, and hide-me
+    actually hiding you from another client's map) need a second
+    player/account to truly verify.

@@ -15,6 +15,7 @@ import net.risingworld.api.ui.style.Position;
 import net.risingworld.api.ui.style.ScaleMode;
 
 import net.picsoul.rw.minimap.config.MinimapConfig;
+import net.picsoul.rw.minimap.config.PlayerPreferences;
 import net.picsoul.rw.minimap.radar.RadarBlip;
 import net.picsoul.rw.minimap.render.MarkerTexture;
 import net.picsoul.rw.minimap.waypoint.MapMarker;
@@ -42,6 +43,7 @@ public final class MarkerOverlay {
     private final int maxDashes;
 
     private final MinimapConfig config;
+    private final PlayerPreferences prefs;
     private final Plugin plugin;
     private final UIElement box;          // circular clip container
     private final UIElement labelParent;  // non-clipped layer for name labels
@@ -92,9 +94,10 @@ public final class MarkerOverlay {
     private final HashMap<Long, Boolean> labelShown = new HashMap<>();
     private boolean spawnLabelShown = false;
 
-    public MarkerOverlay(MinimapConfig config, int minimapSizePx, int mapAreaSize, UIElement labelParent,
-                         Plugin plugin) {
+    public MarkerOverlay(MinimapConfig config, PlayerPreferences prefs, int minimapSizePx, int mapAreaSize,
+                         UIElement labelParent, Plugin plugin) {
         this.config = config;
+        this.prefs = prefs;
         this.plugin = plugin;
         this.maxIcons = Math.max(1, config.uiLite ? config.uiLiteIconPool : config.markerIconPool);
         this.maxDashes = Math.max(1, config.uiLite ? config.uiLiteDashPool : config.markerDashPool);
@@ -274,7 +277,7 @@ public final class MarkerOverlay {
      * Live-resize this overlay in place for a new map size, without
      * recreating any pooled child element — used by
      * {@code MinimapHud.applyLayoutChange()} when the settings panel's map-
-     * size slider changes {@code config.minimapSizePx}. Every pooled
+     * size slider changes {@code prefs.minimapSizePx}. Every pooled
      * element's actual screen position is recomputed every frame from
      * {@code center}/{@code radius}/{@code labelOffset} via {@link #project},
      * so updating just those three fields (plus resizing the clip box itself)
@@ -590,7 +593,7 @@ public final class MarkerOverlay {
                 if (iconsUsed >= iconEls.length) break;
                 // Privacy: your own markers (default + global) always show; other
                 // players' markers show only if they are global.
-                if (config.waypointPrivacy && !m.isGlobal() && m.playerDbId() != viewerDbId) {
+                if (prefs.waypointPrivacy && !m.isGlobal() && m.playerDbId() != viewerDbId) {
                     labelShown.remove(m.id());
                     continue;
                 }

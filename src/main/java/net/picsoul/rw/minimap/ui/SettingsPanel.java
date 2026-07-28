@@ -10,6 +10,7 @@ import net.risingworld.api.ui.style.TextAnchor;
 
 import net.picsoul.rw.minimap.config.MinimapConfig;
 import net.picsoul.rw.minimap.config.MinimapConfig.Corner;
+import net.picsoul.rw.minimap.config.PlayerPreferences;
 
 /**
  * A small, self-contained settings window the player opens with {@code /mm settings}.
@@ -34,7 +35,8 @@ public final class SettingsPanel {
     /** Result of a click hit-test on the panel. */
     public enum Action {
         NONE, CHANGE_IN, CHANGE_OUT, ICON_SIZE_TRACK, MAP_SIZE_TRACK, CORNER_CYCLE,
-        SET_ROTATE_ON, SET_ROTATE_OFF, SET_CONTOUR_ON, SET_CONTOUR_OFF, RESET_DEFAULTS, CLOSE
+        SET_ROTATE_ON, SET_ROTATE_OFF, SET_CONTOUR_ON, SET_CONTOUR_OFF,
+        SET_HIDDEN_ON, SET_HIDDEN_OFF, RESET_DEFAULTS, CLOSE
     }
 
     private static final int PANEL_W = 320;
@@ -54,6 +56,7 @@ public final class SettingsPanel {
 
     private final Player player;
     private final MinimapConfig config;
+    private final PlayerPreferences prefs;
 
     private UIElement root;
     private UILabel inValue, outValue, hint;
@@ -76,12 +79,15 @@ public final class SettingsPanel {
      *  clicking a half explicitly SETS that value (not a blind flip), same as
      *  the game's own ON/OFF rows. */
     private UILabel rotateOnBtn, rotateOffBtn, contourOnBtn, contourOffBtn;
+    /** Hide-me-from-others two-state segmented toggle, same shape as rotate/contour. */
+    private UILabel hiddenOnBtn, hiddenOffBtn;
     private boolean built = false;
     private boolean open = false;
 
-    public SettingsPanel(Player player, MinimapConfig config) {
+    public SettingsPanel(Player player, MinimapConfig config, PlayerPreferences prefs) {
         this.player = player;
         this.config = config;
+        this.prefs = prefs;
     }
 
     public boolean isOpen() {
@@ -90,7 +96,7 @@ public final class SettingsPanel {
 
     private void build() {
         if (built) return;
-        int w = PANEL_W, h = 512;
+        int w = PANEL_W, h = 542;
 
         root = new UIElement();
         root.setPivot(Pivot.MiddleCenter);
@@ -140,6 +146,10 @@ public final class SettingsPanel {
         addText("Contour lines", LABEL_X, y, LABEL_W, 20, 13f, TextAnchor.MiddleLeft, LABEL_COLOR[0], LABEL_COLOR[1], LABEL_COLOR[2], 1f);
         contourOnBtn = addButton("ON", CTRL_X, y - 2, segW, 24);
         contourOffBtn = addButton("OFF", CTRL_X + segW + 4f, y - 2, segW, 24);
+        y += 30f;
+        addText("Hide me from others", LABEL_X, y, LABEL_W, 20, 13f, TextAnchor.MiddleLeft, LABEL_COLOR[0], LABEL_COLOR[1], LABEL_COLOR[2], 1f);
+        hiddenOnBtn = addButton("ON", CTRL_X, y - 2, segW, 24);
+        hiddenOffBtn = addButton("OFF", CTRL_X + segW + 4f, y - 2, segW, 24);
         y += 40f;
 
         hint = addText("", 12, y, w - 24, 44, 11f, TextAnchor.UpperCenter, 0.68f, 0.72f, 0.78f, 1f);
@@ -224,16 +234,17 @@ public final class SettingsPanel {
     /** Update every displayed value from the current config + capture state. */
     public void refresh() {
         if (!built) return;
-        inValue.setText("[ " + config.zoomInKeyName + " ]");
+        inValue.setText("[ " + prefs.zoomInKeyName + " ]");
         inValue.updateStyle();
-        outValue.setText("[ " + config.zoomOutKeyName + " ]");
+        outValue.setText("[ " + prefs.zoomOutKeyName + " ]");
         outValue.updateStyle();
         refreshIconSizeVisual();
         refreshMapSizeVisual();
-        cornerBtn.setText(cornerLabel(config.corner));
+        cornerBtn.setText(cornerLabel(prefs.corner));
         cornerBtn.updateStyle();
-        setSegmented(rotateOnBtn, rotateOffBtn, config.rotate);
-        setSegmented(contourOnBtn, contourOffBtn, config.contourEnabled);
+        setSegmented(rotateOnBtn, rotateOffBtn, prefs.rotate);
+        setSegmented(contourOnBtn, contourOffBtn, prefs.contourEnabled);
+        setSegmented(hiddenOnBtn, hiddenOffBtn, prefs.hiddenFromOthers);
         hint.setText("Click Change then press a key to rebind zoom (Esc cancels). Click a"
                 + " slider bar to set it. Reset to Defaults resets everything on this page.");
         hint.updateStyle();
@@ -275,42 +286,43 @@ public final class SettingsPanel {
         refreshIconSizeVisual();
     }
 
-    /** Sync the map-size fill width + numeric label to the current config value. */
+    /** Sync the map-size fill width + numeric label to this player's own preference. */
     private void refreshMapSizeVisual() {
         if (mapSizeFill == null) return;
         float min = config.minimapSizeMinPx, max = config.minimapSizeMaxPx;
         float span = Math.max(0.0001f, max - min);
-        float frac = (clamp(config.minimapSizePx, min, max) - min) / span;
+        float frac = (clamp(prefs.minimapSizePx, min, max) - min) / span;
         mapSizeFill.setSize(SLIDER_TRACK_W * frac, 16, false);
         mapSizeFill.updateStyle();
-        mapSizeValueLabel.setText(config.minimapSizePx + " px");
+        mapSizeValueLabel.setText(prefs.minimapSizePx + " px");
         mapSizeValueLabel.updateStyle();
     }
 
     /**
      * Apply a click on the map-size track. The caller (PicSoulsMiniMap
      * .onUiClick) is responsible for applying the resulting size to the live
-     * HUD; this only updates the config value + this panel's own display.
+     * HUD; this only updates this player's own preference + this panel's own
+     * display.
      */
     public void applyMapSizeFromRelativeX(float relativeXPercent) {
         if (!built) return;
         float min = config.minimapSizeMinPx, max = config.minimapSizeMaxPx;
         float frac = clamp(relativeXPercent / 100f, 0f, 1f);
-        config.minimapSizePx = Math.round(min + frac * (max - min));
+        prefs.minimapSizePx = Math.round(min + frac * (max - min));
         refreshMapSizeVisual();
     }
 
     /**
-     * Advance {@code config.corner} to the next screen corner (wrapping) and
-     * update this panel's display. Like map size, the caller is responsible
-     * for applying it to the live HUD.
+     * Advance this player's own corner preference to the next screen corner
+     * (wrapping) and update this panel's display. Like map size, the caller is
+     * responsible for applying it to the live HUD.
      */
     public void cycleCorner() {
         if (!built) return;
         Corner[] all = Corner.values();
-        int next = (config.corner.ordinal() + 1) % all.length;
-        config.corner = all[next];
-        cornerBtn.setText(cornerLabel(config.corner));
+        int next = (prefs.corner.ordinal() + 1) % all.length;
+        prefs.corner = all[next];
+        cornerBtn.setText(cornerLabel(prefs.corner));
         cornerBtn.updateStyle();
     }
 
@@ -380,6 +392,8 @@ public final class SettingsPanel {
         if (clicked == rotateOffBtn) return Action.SET_ROTATE_OFF;
         if (clicked == contourOnBtn) return Action.SET_CONTOUR_ON;
         if (clicked == contourOffBtn) return Action.SET_CONTOUR_OFF;
+        if (clicked == hiddenOnBtn) return Action.SET_HIDDEN_ON;
+        if (clicked == hiddenOffBtn) return Action.SET_HIDDEN_OFF;
         if (clicked == resetBtn) return Action.RESET_DEFAULTS;
         if (clicked == closeBtn) return Action.CLOSE;
         return Action.NONE;

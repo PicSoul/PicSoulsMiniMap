@@ -82,7 +82,7 @@ public final class MapRenderer {
      * instead of freezing the plugin thread. Tiles not built this pass are left
      * null (drawn as unexplored) and {@code complete} is false.
      */
-    private SnapResult snapshot(int centerX, int centerZ, int cells) {
+    private SnapResult snapshot(int centerX, int centerZ, int cells, boolean contourOn) {
         int half = cells / 2 + 1;
         int minCx = Math.floorDiv(centerX - half, TileRenderer.SIZE);
         int maxCx = Math.floorDiv(centerX + half, TileRenderer.SIZE);
@@ -99,15 +99,17 @@ public final class MapRenderer {
         // A dirty chunk (edited since its tile was built) still gets its stale
         // tile filled in here so it has SOMETHING to show immediately, but is
         // also queued in pass 2 for a background rebuild — see TileCache.invalidate.
+        // Every peek/isDirty/get call is scoped to THIS viewer's own contour
+        // preference — see TileCache's per-chunk dual-variant caching.
         java.util.ArrayList<int[]> missing = new java.util.ArrayList<>();
         for (int j = 0; j < rows; j++) {
             for (int i = 0; i < cols; i++) {
                 int cx = minCx + i, cz = minCz + j;
-                int[] t = cache.peek(cx, cz);
+                int[] t = cache.peek(cx, cz, contourOn);
                 if (t != null) {
                     tiles[j * cols + i] = t;
                 }
-                if (t == null || cache.isDirty(cx, cz)) {
+                if (t == null || cache.isDirty(cx, cz, contourOn)) {
                     missing.add(new int[]{i, j});
                 }
             }
@@ -128,7 +130,7 @@ public final class MapRenderer {
                     complete = false; // out of time this frame — fill the rest later
                     break;
                 }
-                int[] t = cache.get(minCx + m[0], minCz + m[1]);
+                int[] t = cache.get(minCx + m[0], minCz + m[1], contourOn);
                 if (t != null) {
                     tiles[m[1] * cols + m[0]] = t;
                 } else {
@@ -188,10 +190,15 @@ public final class MapRenderer {
      * Render a map centered on (centerX, centerZ). The snapshot is taken now (main
      * thread); the encode runs off-thread; {@code onDone} is invoked on the main
      * thread with the PNG bytes (or null on failure).
+     *
+     * @param contourOn this viewer's own contour preference ({@code PlayerPreferences
+     *        #contourEnabled}) - selects which of TileCache's two cached variants
+     *        of each chunk this render uses.
      */
-    public void renderAsync(int centerX, int centerZ, int cells, int outPx, RenderCallback onDone) {
+    public void renderAsync(int centerX, int centerZ, int cells, int outPx, boolean contourOn,
+                             RenderCallback onDone) {
         long t0 = System.nanoTime();
-        SnapResult result = snapshot(centerX, centerZ, cells);
+        SnapResult result = snapshot(centerX, centerZ, cells, contourOn);
         recordSnap((System.nanoTime() - t0) / 1_000_000.0);
 
         final Snapshot snap = result.snap();

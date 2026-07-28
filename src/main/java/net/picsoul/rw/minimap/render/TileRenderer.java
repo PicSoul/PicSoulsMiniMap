@@ -77,10 +77,15 @@ public final class TileRenderer {
     }
 
     /**
+     * @param contourOn whether to bake contour lines into this render - explicit
+     *        per-call rather than {@code cfg.contourEnabled} (no longer a field;
+     *        contour is a per-player preference, and {@link TileCache} caches
+     *        both variants of a chunk so each viewer's own preference selects
+     *        which one they get).
      * @return a 32*32 ARGB array indexed as {@code tile[z*SIZE + x]}, or {@code null}
      *         if the chunk is unavailable/invalid.
      */
-    public static int[] render(Chunk chunk, MinimapConfig cfg) {
+    public static int[] render(Chunk chunk, MinimapConfig cfg, boolean contourOn) {
         if (chunk == null || !chunk.isValid()) return null;
         float[] ground = chunk.getLODTerrain();
         if (ground == null || ground.length < SIZE * SIZE) return null;
@@ -250,7 +255,7 @@ public final class TileRenderer {
                 float factor = clampf(1f + relief + elevTint, cfg.shadeFactorMin, cfg.shadeFactorMax);
                 int landColor = shade(base, factor);
 
-                if (cfg.contourEnabled && !water && !isHole) {
+                if (contourOn && !water && !isHole) {
                     int band = (int) Math.floor(g / cfg.contourInterval);
                     int bandW = (x > 0) ? (int) Math.floor(ground[Chunk.getTerrainIndex(x - 1, z)] / cfg.contourInterval) : band;
                     int bandN = (z > 0) ? (int) Math.floor(ground[Chunk.getTerrainIndex(x, z - 1)] / cfg.contourInterval) : band;

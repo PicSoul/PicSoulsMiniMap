@@ -47,6 +47,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import net.picsoul.rw.minimap.config.MinimapConfig;
+import net.picsoul.rw.minimap.config.PlayerPreferences;
 import net.picsoul.rw.minimap.render.MapRenderer;
 import net.picsoul.rw.minimap.render.TileCache;
 import net.picsoul.rw.minimap.capability.CapabilityService;
@@ -57,7 +58,7 @@ import net.picsoul.rw.minimap.waypoint.WaypointService;
 
 public class PicSoulsMiniMap extends Plugin implements Listener {
 
-    public static final String PLUGIN_VERSION = "2.74";
+    public static final String PLUGIN_VERSION = "2.75";
     private static final String TAG = "[PicSoulsMiniMap]";
     /** Item type id of the vanilla map (confirmed from the game log: "map (59)"). */
     private static final short VANILLA_MAP_TYPE_ID = 59;
@@ -113,7 +114,8 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
     public void onEnable() {
         config = MinimapConfig.defaults();
         loadDiagnostics(); // persisted dev diagnostic toggles (survive world switches)
-        loadSettings(); // persisted player-facing settings (survive world switches)
+        // Player-facing settings are per-player now (see PlayerPreferences) - each
+        // player's own file is loaded in setupPlayer(), not here.
         // Detect whether this is a fresh game start or a world switch. The OS
         // process start time is identical across a world switch (same game process)
         // but changes when the game is restarted, so comparing it with the value we
@@ -333,8 +335,9 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
 
     private void setupPlayer(Player player) {
         if (sessions.get(player) != null) return;
-        PlayerSession session = new PlayerSession(this, player, config, mapRenderer, waypointService,
-                capabilityService);
+        PlayerPreferences prefs = loadPlayerPrefs(player);
+        PlayerSession session = new PlayerSession(this, player, config, prefs, mapRenderer, waypointService,
+                capabilityService, sessions);
         session.setRenderingEnabled(renderReady && config.terrainRendering); // defer during grace; off if /mm terrain off
         session.setHudAllowed(hudReady); // no UI attach until the world-switch grace has passed
         sessions.put(player, session);
@@ -348,7 +351,9 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
      *  ({@code settingsKeyName}), for a player so their presses reach us. */
     private void registerHotkeys(Player player) {
         try {
-            player.registerKeys(parseKey(config.zoomInKeyName), parseKey(config.zoomOutKeyName),
+            PlayerSession s = sessions.get(player);
+            PlayerPreferences prefs = s != null ? s.getPrefs() : PlayerPreferences.defaults();
+            player.registerKeys(parseKey(prefs.zoomInKeyName), parseKey(prefs.zoomOutKeyName),
                     parseKey(config.settingsKeyName));
             // Registering keys alone is not enough: the client only forwards key
             // input (and PlayerKeyEvent only fires) once this plugin has also
@@ -383,9 +388,10 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
             s.setCaptureWhich(0);
             boolean cancelled = (k == Key.Escape || k == Key.None);
             if (!cancelled) {
-                if (cap == 1) config.zoomInKeyName = k.name();
-                else config.zoomOutKeyName = k.name();
-                saveSettings();
+                PlayerPreferences prefs = s.getPrefs();
+                if (cap == 1) prefs.zoomInKeyName = k.name();
+                else prefs.zoomOutKeyName = k.name();
+                savePlayerPrefs(player, prefs);
             }
             restoreZoomKeyRegistration(player);
             SettingsPanel panel = s.getSettingsPanel();
@@ -409,8 +415,8 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
         }
 
         if (!s.isVisible()) return; // zoom keys only act when the minimap is shown
-        if (k == parseKey(config.zoomInKeyName)) applyZoomStep(s, -1);
-        else if (k == parseKey(config.zoomOutKeyName)) applyZoomStep(s, +1);
+        if (k == parseKey(s.getPrefs().zoomInKeyName)) applyZoomStep(s, -1);
+        else if (k == parseKey(s.getPrefs().zoomOutKeyName)) applyZoomStep(s, +1);
     }
 
     @EventMethod(Threading.Sync)
@@ -425,60 +431,75 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
             case MAP_SIZE_TRACK -> {
                 panel.applyMapSizeFromRelativeX(event.getRelativeMousePositionX());
                 s.getHud().applyLayoutChange();
-                saveSettings();
+                savePlayerPrefs(event.getPlayer(), s.getPrefs());
             }
             case CORNER_CYCLE -> {
                 panel.cycleCorner();
                 s.getHud().applyLayoutChange();
-                saveSettings();
+                savePlayerPrefs(event.getPlayer(), s.getPrefs());
             }
             case SET_ROTATE_ON -> {
-                config.rotate = true;
+                s.getPrefs().rotate = true;
+                savePlayerPrefs(event.getPlayer(), s.getPrefs());
                 panel.refresh();
             }
             case SET_ROTATE_OFF -> {
-                config.rotate = false;
+                s.getPrefs().rotate = false;
+                savePlayerPrefs(event.getPlayer(), s.getPrefs());
                 panel.refresh();
             }
             case SET_CONTOUR_ON -> {
-                if (!config.contourEnabled) {
-                    config.contourEnabled = true;
-                    tileCache.clear();
+                PlayerPreferences p = s.getPrefs();
+                if (!p.contourEnabled) {
+                    p.contourEnabled = true;
                     s.invalidateMap();
+                    savePlayerPrefs(event.getPlayer(), p);
                 }
                 panel.refresh();
             }
             case SET_CONTOUR_OFF -> {
-                if (config.contourEnabled) {
-                    config.contourEnabled = false;
-                    tileCache.clear();
+                PlayerPreferences p = s.getPrefs();
+                if (p.contourEnabled) {
+                    p.contourEnabled = false;
                     s.invalidateMap();
+                    savePlayerPrefs(event.getPlayer(), p);
                 }
+                panel.refresh();
+            }
+            case SET_HIDDEN_ON -> {
+                s.getPrefs().hiddenFromOthers = true;
+                savePlayerPrefs(event.getPlayer(), s.getPrefs());
+                panel.refresh();
+            }
+            case SET_HIDDEN_OFF -> {
+                s.getPrefs().hiddenFromOthers = false;
+                savePlayerPrefs(event.getPlayer(), s.getPrefs());
                 panel.refresh();
             }
             case RESET_DEFAULTS -> {
                 // Resets only what's actually on this panel (zoom keys, entity
-                // icon size, map size/corner, rotate, contour) - NOT the /mm
-                // diagreset diagnostic switches (terrain/mapdb/textures/hud/
-                // mapguard/safemode/uilite/minimal/teardown), which are a
-                // separate, unrelated set of crash-diagnosis dev toggles, not
-                // player-facing settings.
-                MinimapConfig d = MinimapConfig.defaults();
-                config.zoomInKeyName = d.zoomInKeyName;
-                config.zoomOutKeyName = d.zoomOutKeyName;
-                config.radarIconPx = d.radarIconPx;
-                config.minimapSizePx = d.minimapSizePx;
-                config.corner = d.corner;
-                config.rotate = d.rotate;
-                config.contourEnabled = d.contourEnabled;
-                tileCache.clear();
-                saveSettings();
-                // Shared config affects every player, same as /mm diagreset.
-                for (PlayerSession ps : sessions.all()) {
-                    restoreZoomKeyRegistration(ps.getPlayer());
-                    ps.invalidateMap();
-                    ps.getHud().applyLayoutChange();
-                }
+                // icon size, map size/corner, rotate, contour, hidden) - NOT
+                // the /mm diagreset diagnostic switches (terrain/mapdb/
+                // textures/hud/mapguard/safemode/uilite/minimal/teardown),
+                // which are a separate, unrelated set of crash-diagnosis dev
+                // toggles, not player-facing settings. Per-player prefs reset
+                // for THIS player only; entity icon size is still a shared
+                // config value (not yet exposed as per-player), so it resets
+                // for everyone, same as always.
+                PlayerPreferences d = PlayerPreferences.defaults();
+                PlayerPreferences p = s.getPrefs();
+                p.zoomInKeyName = d.zoomInKeyName;
+                p.zoomOutKeyName = d.zoomOutKeyName;
+                p.minimapSizePx = d.minimapSizePx;
+                p.corner = d.corner;
+                p.rotate = d.rotate;
+                p.contourEnabled = d.contourEnabled;
+                p.hiddenFromOthers = d.hiddenFromOthers;
+                config.radarIconPx = MinimapConfig.defaults().radarIconPx;
+                restoreZoomKeyRegistration(event.getPlayer());
+                s.invalidateMap();
+                s.getHud().applyLayoutChange();
+                savePlayerPrefs(event.getPlayer(), p);
                 panel.refresh();
                 event.getPlayer().sendTextMessage(TAG + " settings reset to defaults.");
             }
@@ -527,9 +548,9 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
     /** Apply a zoom to a session's HUD and persist it as the current level. */
     private void setSessionZoom(PlayerSession s, int cells) {
         cells = Math.max(16, Math.min(1024, cells));
-        config.defaultZoomCells = cells;     // so an as-yet-unbuilt HUD builds at this zoom
-        s.getHud().setZoom(cells);           // live-updates if already built
-        saveSettings();
+        s.getPrefs().defaultZoomCells = cells; // so a rebuilt HUD builds at this zoom
+        s.getHud().setZoom(cells);             // live-updates if already built
+        savePlayerPrefs(s.getPlayer(), s.getPrefs());
     }
 
     /** Resolve a Key enum name (tolerant of case/spaces + a few aliases). */
@@ -558,6 +579,7 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
     public void onDisconnect(PlayerDisconnectEvent event) {
         PlayerSession session = sessions.remove(event.getPlayer());
         if (session != null) {
+            savePlayerPrefs(event.getPlayer(), session.getPrefs()); // safety net; every mutation already saves
             session.destroy();
         }
     }
@@ -627,7 +649,8 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
                         + " | currently in cave view=" + session.getHud().isCaveMode());
                 player.sendTextMessage(TAG + " trees=" + (config.showVegetation ? "ON" : "OFF")
                         + " radar=" + (config.showRadar ? "ON" : "OFF")
-                        + " players=" + (config.showOtherPlayers ? "ON" : "OFF"));
+                        + " players=" + (session.getPrefs().showOtherPlayers ? "ON" : "OFF")
+                        + " hidden=" + (session.getPrefs().hiddenFromOthers ? "ON" : "OFF"));
             }
             case "dev" -> {
                 config.devAllTiers = !config.devAllTiers;
@@ -685,10 +708,11 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
                         + ". cumulative " + mapRenderer.statsLine());
             }
             case "contour" -> {
-                config.contourEnabled = !config.contourEnabled;
-                tileCache.clear();
+                PlayerPreferences p = session.getPrefs();
+                p.contourEnabled = !p.contourEnabled;
                 session.invalidateMap();
-                player.sendTextMessage(TAG + " contour lines " + (config.contourEnabled ? "ON" : "OFF"));
+                savePlayerPrefs(player, p);
+                player.sendTextMessage(TAG + " contour lines " + (p.contourEnabled ? "ON" : "OFF"));
             }
             case "blur" -> {
                 if (parts.length > 2) {
@@ -738,10 +762,21 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
                         + " blips (red=hostile, amber=defensive, green=animal, blue=human, tan=mount).");
             }
             case "players" -> {
-                config.showOtherPlayers = parseOnOff(parts, config.showOtherPlayers);
-                player.sendTextMessage(TAG + " other-player markers " + (config.showOtherPlayers ? "ON" : "OFF")
+                PlayerPreferences p = session.getPrefs();
+                p.showOtherPlayers = parseOnOff(parts, p.showOtherPlayers);
+                savePlayerPrefs(player, p);
+                player.sendTextMessage(TAG + " other-player markers " + (p.showOtherPlayers ? "ON" : "OFF")
                         + " — shows every other connected player's live position/name on the map,"
                         + " always visible (clamped to the rim like the spawn marker when out of range).");
+            }
+            case "hidden" -> {
+                PlayerPreferences p = session.getPrefs();
+                p.hiddenFromOthers = parseOnOff(parts, p.hiddenFromOthers);
+                savePlayerPrefs(player, p);
+                player.sendTextMessage(TAG + " hide-me-from-others " + (p.hiddenFromOthers ? "ON" : "OFF")
+                        + (p.hiddenFromOthers
+                                ? " — your position no longer appears on other players' minimaps."
+                                : " — your position is visible on other players' minimaps again."));
             }
             case "fruitdebug" -> {
                 config.debugFruitLogging = parseOnOff(parts, config.debugFruitLogging);
@@ -757,8 +792,10 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
                 player.sendTextMessage(TAG + " smooth panning " + (config.smoothPanning ? "ON" : "OFF"));
             }
             case "rotate" -> {
-                config.rotate = !config.rotate;
-                player.sendTextMessage(TAG + " map rotation " + (config.rotate ? "ON" : "OFF"));
+                PlayerPreferences p = session.getPrefs();
+                p.rotate = !p.rotate;
+                savePlayerPrefs(player, p);
+                player.sendTextMessage(TAG + " map rotation " + (p.rotate ? "ON" : "OFF"));
             }
             case "waypoints", "wp" -> {
                 if (parts.length > 2 && parts[2].equalsIgnoreCase("refresh")) {
@@ -771,10 +808,11 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
                 }
             }
             case "wpprivacy", "privacy" -> {
-                config.waypointPrivacy = parseOnOff(parts, config.waypointPrivacy);
-                saveSettings();
-                player.sendTextMessage(TAG + " waypoint privacy " + (config.waypointPrivacy ? "ON" : "OFF")
-                        + (config.waypointPrivacy
+                PlayerPreferences p = session.getPrefs();
+                p.waypointPrivacy = parseOnOff(parts, p.waypointPrivacy);
+                savePlayerPrefs(player, p);
+                player.sendTextMessage(TAG + " waypoint privacy " + (p.waypointPrivacy ? "ON" : "OFF")
+                        + (p.waypointPrivacy
                                 ? " — your own markers all show; other players' show only if Global."
                                 : " — every marker shows regardless of owner."));
             }
@@ -794,8 +832,8 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
                     }
                 }
                 player.sendTextMessage(TAG + " zoom: " + session.getHud().getZoom()
-                        + " cells across (keys: " + config.zoomInKeyName + " in / "
-                        + config.zoomOutKeyName + " out)");
+                        + " cells across (keys: " + session.getPrefs().zoomInKeyName + " in / "
+                        + session.getPrefs().zoomOutKeyName + " out)");
             }
             case "zoomkey" -> {
                 if (parts.length < 3) {
@@ -809,14 +847,15 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
                             + " PageUp, PageDown, LeftBracket, Equals, NumpadPlus, Home, End…");
                     break;
                 }
-                if (dir.equals("in")) config.zoomInKeyName = k.name();
-                else if (dir.equals("out")) config.zoomOutKeyName = k.name();
+                PlayerPreferences p = session.getPrefs();
+                if (dir.equals("in")) p.zoomInKeyName = k.name();
+                else if (dir.equals("out")) p.zoomOutKeyName = k.name();
                 else {
                     player.sendTextMessage(TAG + " usage: /mm zoomkey in|out <KeyName>");
                     break;
                 }
-                saveSettings();
-                for (PlayerSession s : sessions.all()) restoreZoomKeyRegistration(s.getPlayer());
+                savePlayerPrefs(player, p);
+                restoreZoomKeyRegistration(player); // this player's own binding only - not everyone's
                 if (session.getSettingsPanel().isOpen()) session.getSettingsPanel().refresh();
                 player.sendTextMessage(TAG + " zoom-" + dir + " key set to " + k.name());
             }
@@ -961,7 +1000,7 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
             case "version" -> {
                 player.sendTextMessage(TAG + " version " + PLUGIN_VERSION);
             }
-            default -> player.sendTextMessage(TAG + " usage: /mm [toggle|status|caps|dev|ids|perf|contour|blur|caves|cavemode|trees|fruitdebug|smooth|rotate|zoom|zoomkey|settings|waypoints|wpprivacy|spawn|terrain|mapdb|notex|hud|mapguard|safemode|uilite|minimal|teardown|hudgrace|diagreset|version]");
+            default -> player.sendTextMessage(TAG + " usage: /mm [toggle|status|caps|dev|ids|perf|contour|blur|caves|cavemode|trees|fruitdebug|smooth|rotate|zoom|zoomkey|settings|waypoints|wpprivacy|spawn|players|hidden|terrain|mapdb|notex|hud|mapguard|safemode|uilite|minimal|teardown|hudgrace|diagreset|version]");
         }
     }
 
@@ -1296,15 +1335,68 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
         return Paths.get("diagnostics.txt");
     }
 
-    /** The player-facing settings file in the plugin folder (falls back to CWD).
-     *  See {@link #diagnosticsFile()} for the separate dev-toggle file. */
-    private Path settingsFile() {
+    /** The legacy, pre-per-player shared settings file (falls back to CWD).
+     *  No longer written to - kept only as a one-time migration seed for a
+     *  player's first-ever per-player prefs file, see {@link #loadPlayerPrefs}. */
+    private Path legacySettingsFile() {
         try {
             String dir = getPath();
             if (dir != null && !dir.isEmpty()) return Paths.get(dir, "settings.txt");
         } catch (Throwable ignored) {
         }
         return Paths.get("settings.txt");
+    }
+
+    /** Folder holding one preferences file per player, keyed by their stable
+     *  {@code Player.getUID()} (not {@code getID()}, which changes every
+     *  reconnect). */
+    private Path playerPrefsDir() {
+        try {
+            String dir = getPath();
+            if (dir != null && !dir.isEmpty()) return Paths.get(dir, "players");
+        } catch (Throwable ignored) {
+        }
+        return Paths.get("players");
+    }
+
+    private Path playerPrefsFile(String safeUid) {
+        return playerPrefsDir().resolve(safeUid + ".txt");
+    }
+
+    /** {@code Player.getUID()}, sanitized for use as a filename - the UID format
+     *  isn't guaranteed filename-safe on every platform. */
+    private static String safeUid(Player player) {
+        String uid;
+        try {
+            uid = player.getUID();
+        } catch (Throwable t) {
+            uid = null;
+        }
+        if (uid == null || uid.isEmpty()) uid = "unknown";
+        return uid.replaceAll("[^A-Za-z0-9_-]", "_");
+    }
+
+    /**
+     * Load one player's own preferences. If they have never connected before
+     * (no {@code players/<uid>.txt} yet) but the old shared
+     * {@link #legacySettingsFile()} exists, seed from it instead of hardcoded
+     * defaults - preserving whatever tuning existed before this became
+     * per-player, rather than silently resetting it on upgrade. Uses the same
+     * key=value parser either way ({@link PlayerPreferences#load}); the legacy
+     * file just doesn't have the newer keys (rotate/players/contour/hidden),
+     * which fall back to defaults exactly as a brand-new file would.
+     */
+    private PlayerPreferences loadPlayerPrefs(Player player) {
+        Path own = playerPrefsFile(safeUid(player));
+        if (Files.exists(own)) return PlayerPreferences.load(own);
+        Path legacy = legacySettingsFile();
+        if (Files.exists(legacy)) return PlayerPreferences.load(legacy);
+        return PlayerPreferences.defaults();
+    }
+
+    /** Persist one player's own preferences to their own file. */
+    private void savePlayerPrefs(Player player, PlayerPreferences prefs) {
+        prefs.save(playerPrefsFile(safeUid(player)));
     }
 
     /** Load the persisted diagnostic kill-switches so a setting survives a world
@@ -1368,62 +1460,6 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
             Files.write(diagnosticsFile(), lines);
         } catch (Throwable t) {
             System.out.println(TAG + " could not save diagnostics.txt: " + t.getMessage());
-        }
-    }
-
-    /** Load the persisted player-facing settings (zoom keys/level, map size/
-     *  corner, waypoint privacy) so they survive a world switch. */
-    private void loadSettings() {
-        try {
-            Path f = settingsFile();
-            if (f == null || !Files.exists(f)) return;
-            for (String line : Files.readAllLines(f)) {
-                String s = line.trim().toLowerCase();
-                if (s.isEmpty() || s.startsWith("#")) continue;
-                int eq = s.indexOf('=');
-                if (eq <= 0) continue;
-                String key = s.substring(0, eq).trim();
-                String val = s.substring(eq + 1).trim();
-                boolean on = val.equals("on") || val.equals("true") || val.equals("1");
-                switch (key) {
-                    case "wpprivacy" -> config.waypointPrivacy = on;
-                    case "zoom" -> {
-                        try { config.defaultZoomCells = Integer.parseInt(val); }
-                        catch (NumberFormatException ignored) { }
-                    }
-                    case "zoominkey" -> { Key kk = parseKey(val); if (kk != Key.None) config.zoomInKeyName = kk.name(); }
-                    case "zoomoutkey" -> { Key kk = parseKey(val); if (kk != Key.None) config.zoomOutKeyName = kk.name(); }
-                    case "mapsize" -> {
-                        try { config.minimapSizePx = Integer.parseInt(val); }
-                        catch (NumberFormatException ignored) { }
-                    }
-                    case "corner" -> {
-                        try { config.corner = MinimapConfig.Corner.valueOf(val.toUpperCase()); }
-                        catch (IllegalArgumentException ignored) { }
-                    }
-                    default -> { }
-                }
-            }
-        } catch (Throwable t) {
-            System.out.println(TAG + " could not load settings.txt: " + t.getMessage());
-        }
-    }
-
-    /** Persist the player-facing settings. */
-    private void saveSettings() {
-        try {
-            List<String> lines = new ArrayList<>();
-            lines.add("# PicSoulsMiniMap settings (see /mm settings) - player-facing preferences;"
-                    + " see diagnostics.txt for crash-diagnosis dev toggles.");
-            lines.add("wpprivacy=" + (config.waypointPrivacy ? "on" : "off"));
-            lines.add("zoom=" + config.defaultZoomCells);
-            lines.add("zoominkey=" + config.zoomInKeyName);
-            lines.add("zoomoutkey=" + config.zoomOutKeyName);
-            lines.add("mapsize=" + config.minimapSizePx);
-            lines.add("corner=" + config.corner.name());
-            Files.write(settingsFile(), lines);
-        } catch (Throwable t) {
-            System.out.println(TAG + " could not save settings.txt: " + t.getMessage());
         }
     }
 

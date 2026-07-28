@@ -1,6 +1,6 @@
 PicSouls MiniMap - Command List
 ================================
-Plugin version: 2.74
+Plugin version: 2.75
 
 All commands are typed in the in-game chat and start with either "/mm" or
 "/minimap" (the two are interchangeable). Commands are not case-sensitive.
@@ -95,14 +95,22 @@ DISPLAY
                   and display name. Use this to get the full roster of what
                   exists, e.g. for planning custom per-species radar icons.
 
-/mm players [on|off]   Toggle other-connected-player markers on the map: every
-                  other player's live position and name, using the same
+/mm players [on|off]   Toggle other-connected-player markers on YOUR OWN map:
+                  every other player's live position and name, using the same
                   teardrop-arrow shape as your own marker (a distinct tint so
                   it's never confused with yours). Always visible - no
                   distance fade - and clamped to just inside the rim when
                   out of the current zoom range, the same behavior as the
                   spawn marker (just without its dashed line). Requires the
-                  compass tier, same as waypoints/spawn.
+                  compass tier, same as waypoints/spawn. This only controls
+                  whether YOU see others - see /mm hidden to control whether
+                  OTHERS see you.
+
+/mm hidden [on|off]   Hide your own position from every other connected
+                  player's minimap (the reverse of /mm players - this
+                  controls whether others see you, not whether you see
+                  them). Also available as a toggle in the settings panel
+                  ("Hide me from others").
 
 /mm fruitdebug [on|off]   Diagnostic. Logs every fruit tree the renderer
                   processes near you straight to the server console (name,
@@ -133,14 +141,18 @@ DISPLAY
                   size - click anywhere
                   along a bar to set it (no drag, just click-to-set). A button
                   to cycle which screen corner the map sits in, and ON/OFF
-                  toggles for map rotation (same as /mm rotate) and contour
-                  lines (same as /mm contour, on by default). Map size and
-                  corner persist across world switches, same as zoom. A
-                  "Reset to Defaults" button resets everything on this page
-                  (zoom keys, entity icon size, map size/corner, rotate,
-                  contour) - not the /mm diagreset diagnostic switches, which
-                  are a separate set of crash-diagnosis dev toggles. Your
-                  mouse cursor is freed while the window is open.
+                  toggles for map rotation (same as /mm rotate), contour
+                  lines (same as /mm contour, on by default), and hiding
+                  yourself from other players' minimaps (same as /mm hidden).
+                  Map size, corner, rotate, contour and hidden all persist
+                  per player, across world switches and reconnects, same as
+                  zoom. A "Reset to Defaults" button resets everything on
+                  this page for YOU (zoom keys, entity icon size, map
+                  size/corner, rotate, contour, hidden) - not other
+                  connected players, and not the /mm diagreset diagnostic
+                  switches, which are a separate set of crash-diagnosis dev
+                  toggles. Your mouse cursor is freed while the window is
+                  open.
 
 
 WAYPOINTS & SPAWN  (require a compass equipped to be visible)
@@ -289,6 +301,11 @@ DIAGNOSTICS
 
 Full command summary:
   /mm [toggle | status | caps | dev | ids | npcs | entities | perf | contour | blur | caves | cavemode |
-       trees | radar | players | fruitdebug | smooth | rotate | zoom | zoomkey | settings | waypoints |
-       wp | wpprivacy | spawn | terrain | mapdb | notex | hud | mapguard | safemode | uilite | minimal |
-       teardown | hudgrace | diagreset | version]
+       trees | radar | players | hidden | fruitdebug | smooth | rotate | zoom | zoomkey | settings |
+       waypoints | wp | wpprivacy | spawn | terrain | mapdb | notex | hud | mapguard | safemode | uilite |
+       minimal | teardown | hudgrace | diagreset | version]
+
+Player settings (map size/corner, zoom keys/level, rotate, contour, waypoint
+privacy, players/hidden toggles) are now saved per player, in
+Plugins/PicSoulsMiniMap/players/<your-uid>.txt - each connecting player gets
+their own file and their own preferences, not one shared config.

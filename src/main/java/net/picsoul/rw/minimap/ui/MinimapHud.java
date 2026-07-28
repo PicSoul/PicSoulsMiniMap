@@ -18,9 +18,12 @@ import net.risingworld.api.ui.style.ScaleMode;
 import net.risingworld.api.utils.Vector3f;
 
 import net.picsoul.rw.minimap.config.MinimapConfig;
+import net.picsoul.rw.minimap.config.PlayerPreferences;
 import net.picsoul.rw.minimap.radar.RadarScanner;
 import net.picsoul.rw.minimap.render.MapRenderer;
 import net.picsoul.rw.minimap.render.MarkerTexture;
+import net.picsoul.rw.minimap.session.PlayerSession;
+import net.picsoul.rw.minimap.session.SessionRegistry;
 import net.picsoul.rw.minimap.waypoint.MapMarker;
 import net.picsoul.rw.minimap.waypoint.WaypointService;
 
@@ -29,8 +32,10 @@ public class MinimapHud {
     private final Player player;
     private final Plugin plugin;
     private final MinimapConfig config;
+    private final PlayerPreferences prefs;
     private final MapRenderer renderer;
     private final WaypointService waypoints;
+    private final SessionRegistry sessions;
     private final RadarScanner radar;
 
     private MarkerOverlay overlay;
@@ -99,15 +104,17 @@ public class MinimapHud {
     private long sPrevHT, sCurHT;
     private float dispH;
 
-    public MinimapHud(Plugin plugin, Player player, MinimapConfig config, MapRenderer renderer,
-                      WaypointService waypoints) {
+    public MinimapHud(Plugin plugin, Player player, MinimapConfig config, PlayerPreferences prefs,
+                      MapRenderer renderer, WaypointService waypoints, SessionRegistry sessions) {
         this.plugin = plugin;
         this.player = player;
         this.config = config;
+        this.prefs = prefs;
         this.renderer = renderer;
         this.waypoints = waypoints;
+        this.sessions = sessions;
         this.radar = new RadarScanner(config, player);
-        this.zoomCells = config.defaultZoomCells;
+        this.zoomCells = prefs.defaultZoomCells;
     }
 
     /** Minimal-UI mode: a single container holding one plain label. Two UI elements
@@ -116,10 +123,10 @@ public class MinimapHud {
     private UILabel minimalLabel;
 
     private void buildMinimal() {
-        int w = config.minimapSizePx + 32;
+        int w = prefs.minimapSizePx + 32;
         infoContainer = new UIElement();
-        infoContainer.setPivot(config.corner.pivot);
-        infoContainer.setPosition(config.corner.xPercent, config.corner.yPercent, true);
+        infoContainer.setPivot(prefs.corner.pivot);
+        infoContainer.setPosition(prefs.corner.xPercent, prefs.corner.yPercent, true);
         infoContainer.setSize(w, 24, false);
         infoContainer.setBackgroundColor(0f, 0f, 0f, 0f);
         minimalLabel = new UILabel("");
@@ -133,24 +140,24 @@ public class MinimapHud {
     private void build() {
         if (built) return;
         if (config.minimalUi) { buildMinimal(); return; }
-        int size = config.minimapSizePx;
+        int size = prefs.minimapSizePx;
 
         int mapAreaSize = size + 32;
         int infoAreaHeight = 56; // room for coords + optional time + optional date lines
 
-        this.zoomCells = config.defaultZoomCells;
+        this.zoomCells = prefs.defaultZoomCells;
         recomputeZoomGeometry();
 
         // Main container for the map + cardinal labels
         mapContainer = new UIElement();
-        mapContainer.setPivot(config.corner.pivot);
-        mapContainer.setPosition(config.corner.xPercent, config.corner.yPercent, true);
+        mapContainer.setPivot(prefs.corner.pivot);
+        mapContainer.setPosition(prefs.corner.xPercent, prefs.corner.yPercent, true);
         mapContainer.setSize(mapAreaSize, mapAreaSize, false);
         mapContainer.setBackgroundColor(0f, 0f, 0f, 0f);
 
         // Separate, isolated container for the info label
         infoContainer = new UIElement();
-        infoContainer.setPivot(config.corner.pivot);
+        infoContainer.setPivot(prefs.corner.pivot);
         float mapContainerHeightPercent = (float)mapAreaSize / 1080f * 100f;
         // Bottom corners: the info block (coords/time/date) needs to sit ABOVE
         // the map instead of below it, or it either runs off the bottom of the
@@ -160,12 +167,12 @@ public class MinimapHud {
         // subtracting the map's height instead of adding it places the info
         // block's bottom edge exactly at the map's top edge - directly above,
         // not overlapping - with no other change needed.
-        boolean bottomCorner = config.corner == MinimapConfig.Corner.BOTTOM_LEFT
-                || config.corner == MinimapConfig.Corner.BOTTOM_RIGHT;
+        boolean bottomCorner = prefs.corner == MinimapConfig.Corner.BOTTOM_LEFT
+                || prefs.corner == MinimapConfig.Corner.BOTTOM_RIGHT;
         float infoY = bottomCorner
-                ? config.corner.yPercent - mapContainerHeightPercent
-                : config.corner.yPercent + mapContainerHeightPercent;
-        infoContainer.setPosition(config.corner.xPercent, infoY, true);
+                ? prefs.corner.yPercent - mapContainerHeightPercent
+                : prefs.corner.yPercent + mapContainerHeightPercent;
+        infoContainer.setPosition(prefs.corner.xPercent, infoY, true);
         infoContainer.setSize(mapAreaSize, infoAreaHeight, false);
         infoContainer.setBackgroundColor(0f, 0f, 0f, 0f);
 
@@ -241,7 +248,7 @@ public class MinimapHud {
             label.addTo(mapContainer);
         }
 
-        overlay = new MarkerOverlay(config, size, mapAreaSize, mapContainer, plugin);
+        overlay = new MarkerOverlay(config, prefs, size, mapAreaSize, mapContainer, plugin);
         mapContainer.addChild(overlay.root());
 
         built = true;
@@ -330,7 +337,7 @@ public class MinimapHud {
 
         float heading = this.dispH;
 
-        if (config.rotate) {
+        if (prefs.rotate) {
             mapBox.style.rotate.set(-heading);
             marker.style.rotate.set(heading);
         } else {
@@ -444,8 +451,8 @@ public class MinimapHud {
 
     private void updateCardinalLabels(float playerHeading) {
         float angleForNorth = -playerHeading;
-        
-        int size = config.minimapSizePx;
+
+        int size = prefs.minimapSizePx;
         int mapAreaSize = size + 32;
         float radius = size / 2f + 12f;
         float centerX = mapAreaSize / 2f;
@@ -529,7 +536,7 @@ public class MinimapHud {
                 renderer.renderCaveAsync(ncx, ncy, ncz, renderCells, outPx,
                         (png, complete) -> onRenderDone(png, ncx, ncz, ncy, complete));
             } else {
-                renderer.renderAsync(ncx, ncz, renderCells, outPx,
+                renderer.renderAsync(ncx, ncz, renderCells, outPx, prefs.contourEnabled,
                         (png, complete) -> onRenderDone(png, ncx, ncz, Integer.MIN_VALUE, complete));
             }
         }
@@ -551,7 +558,7 @@ public class MinimapHud {
     /** Recompute all map geometry derived from the current zoom — {@link #zoomCells}
      *  normally, or {@code config.caveZoomCells} while {@link #caveMode} is on. */
     private void recomputeZoomGeometry() {
-        int size = config.minimapSizePx;
+        int size = prefs.minimapSizePx;
         int cells = caveMode ? config.caveZoomCells : zoomCells;
         pxPerCell = (float) size / cells;
         renderCells = cells + 2 * config.panPaddingCells;
@@ -602,7 +609,7 @@ public class MinimapHud {
     }
 
     /**
-     * Apply a live {@code config.minimapSizePx} or {@code config.corner}
+     * Apply a live {@code prefs.minimapSizePx} or {@code prefs.corner}
      * change by resizing/repositioning the existing top-level containers in
      * place — the same "mutate, don't recreate" approach {@link #setZoom}
      * already uses for live zoom changes — rather than a full element-tree
@@ -618,7 +625,7 @@ public class MinimapHud {
      * independently, in roughly the same id range, on two separate settings
      * (size, then corner). A resize/reposition never needed new elements at
      * all: {@link #recomputeZoomGeometry()} already reads
-     * {@code config.minimapSizePx} fresh, {@link #applyGeometryChange()}
+     * {@code prefs.minimapSizePx} fresh, {@link #applyGeometryChange()}
      * already resizes the two image layers in place, the cardinal labels
      * already recompute their position every frame in
      * {@link #updateCardinalLabels}, and {@link MarkerOverlay#updateGeometry}
@@ -628,23 +635,23 @@ public class MinimapHud {
      */
     public void applyLayoutChange() {
         if (!built || config.minimalUi) return;
-        int size = config.minimapSizePx;
+        int size = prefs.minimapSizePx;
         int mapAreaSize = size + 32;
         int infoAreaHeight = 56;
 
-        mapContainer.setPivot(config.corner.pivot);
-        mapContainer.setPosition(config.corner.xPercent, config.corner.yPercent, true);
+        mapContainer.setPivot(prefs.corner.pivot);
+        mapContainer.setPosition(prefs.corner.xPercent, prefs.corner.yPercent, true);
         mapContainer.setSize(mapAreaSize, mapAreaSize, false);
         mapContainer.updateStyle();
 
         float mapContainerHeightPercent = (float) mapAreaSize / 1080f * 100f;
-        boolean bottomCorner = config.corner == MinimapConfig.Corner.BOTTOM_LEFT
-                || config.corner == MinimapConfig.Corner.BOTTOM_RIGHT;
+        boolean bottomCorner = prefs.corner == MinimapConfig.Corner.BOTTOM_LEFT
+                || prefs.corner == MinimapConfig.Corner.BOTTOM_RIGHT;
         float infoY = bottomCorner
-                ? config.corner.yPercent - mapContainerHeightPercent
-                : config.corner.yPercent + mapContainerHeightPercent;
-        infoContainer.setPivot(config.corner.pivot);
-        infoContainer.setPosition(config.corner.xPercent, infoY, true);
+                ? prefs.corner.yPercent - mapContainerHeightPercent
+                : prefs.corner.yPercent + mapContainerHeightPercent;
+        infoContainer.setPivot(prefs.corner.pivot);
+        infoContainer.setPosition(prefs.corner.xPercent, infoY, true);
         infoContainer.setSize(mapAreaSize, infoAreaHeight, false);
         infoContainer.updateStyle();
 
@@ -705,7 +712,7 @@ public class MinimapHud {
         }
         Vector3f sp = spawnPos;
         List<MapMarker> mk = (waypoints != null) ? waypoints.getMarkers() : Collections.emptyList();
-        overlay.draw(dispX, dispZ, dispH, pxPerCell, config.rotate, mk,
+        overlay.draw(dispX, dispZ, dispH, pxPerCell, prefs.rotate, mk,
                 sp != null, sp != null ? sp.x : 0d, sp != null ? sp.z : 0d,
                 playerX, playerZ, viewerDbId());
 
@@ -717,13 +724,13 @@ public class MinimapHud {
             }
             int visibleZoomCells = caveMode ? config.caveZoomCells : zoomCells;
             radar.maybeScan(new Vector3f((float) playerX, py, (float) playerZ), visibleZoomCells);
-            overlay.drawRadar(dispX, dispZ, dispH, pxPerCell, config.rotate, radar.getBlips());
+            overlay.drawRadar(dispX, dispZ, dispH, pxPerCell, prefs.rotate, radar.getBlips());
         } else {
             overlay.hideRadar();
         }
 
-        if (config.showOtherPlayers) {
-            overlay.drawOtherPlayers(dispX, dispZ, dispH, pxPerCell, config.rotate, gatherOtherPlayers());
+        if (prefs.showOtherPlayers) {
+            overlay.drawOtherPlayers(dispX, dispZ, dispH, pxPerCell, prefs.rotate, gatherOtherPlayers());
         } else {
             overlay.hideOtherPlayers();
         }
@@ -746,6 +753,8 @@ public class MinimapHud {
         java.util.ArrayList<Player> others = new java.util.ArrayList<>(all.length);
         for (Player p : all) {
             if (p == null || p == player) continue;
+            PlayerSession ps = sessions.get(p);
+            if (ps != null && ps.getPrefs().hiddenFromOthers) continue;
             others.add(p);
         }
         if (others.isEmpty()) return Collections.emptyList();

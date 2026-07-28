@@ -14,6 +14,7 @@ import net.risingworld.api.utils.Vector3f;
 import net.picsoul.rw.minimap.capability.Capabilities;
 import net.picsoul.rw.minimap.capability.CapabilityService;
 import net.picsoul.rw.minimap.config.MinimapConfig;
+import net.picsoul.rw.minimap.config.PlayerPreferences;
 import net.picsoul.rw.minimap.render.MapRenderer;
 import net.picsoul.rw.minimap.ui.MinimapHud;
 import net.picsoul.rw.minimap.ui.SettingsPanel;
@@ -30,6 +31,7 @@ public class PlayerSession {
     private final Plugin plugin;
     private final Player player;
     private final MinimapConfig config;
+    private final PlayerPreferences prefs;
     private final MinimapHud hud;
     private final CapabilityService capabilities;
 
@@ -56,13 +58,15 @@ public class PlayerSession {
      *  and kept live by the spawn events (see {@link #setCurrentSpawn}). */
     private Vector3f currentSpawn;
 
-    public PlayerSession(Plugin plugin, Player player, MinimapConfig config, MapRenderer renderer,
-                         WaypointService waypoints, CapabilityService capabilities) {
+    public PlayerSession(Plugin plugin, Player player, MinimapConfig config, PlayerPreferences prefs,
+                         MapRenderer renderer, WaypointService waypoints, CapabilityService capabilities,
+                         SessionRegistry sessions) {
         this.plugin = plugin;
         this.player = player;
         this.config = config;
+        this.prefs = prefs;
         this.capabilities = capabilities;
-        this.hud = new MinimapHud(plugin, player, config, renderer, waypoints);
+        this.hud = new MinimapHud(plugin, player, config, prefs, renderer, waypoints, sessions);
         this.currentSpawn = resolveInitialSpawn();
         hud.setSpawn(currentSpawn);
     }
@@ -359,9 +363,15 @@ public class PlayerSession {
     /** The settings window for this player (created on first use). */
     public SettingsPanel getSettingsPanel() {
         if (settingsPanel == null) {
-            settingsPanel = new SettingsPanel(player, config);
+            settingsPanel = new SettingsPanel(player, config, prefs);
         }
         return settingsPanel;
+    }
+
+    /** This player's own persisted preferences (map size, corner, rotate,
+     *  contour, zoom/keys, waypoint privacy, other-players toggle, hidden). */
+    public PlayerPreferences getPrefs() {
+        return prefs;
     }
 
     public int getCaptureWhich() {

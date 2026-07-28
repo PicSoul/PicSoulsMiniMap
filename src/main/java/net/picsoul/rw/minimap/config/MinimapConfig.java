@@ -60,31 +60,19 @@ public class MinimapConfig {
     public boolean dateShowYear = true;
 
     // ---- HUD layout ----
-    public int minimapSizePx = 200;
-    /** Slider bounds for the in-game map-size control (/mm settings). */
+    /** Per-player now (see {@link net.picsoul.rw.minimap.config.PlayerPreferences#minimapSizePx});
+     *  these remain here only as the shared slider bounds for the in-game map-size control. */
     public int minimapSizeMinPx = 120;
     public int minimapSizeMaxPx = 360;
     public boolean circular = false;
-    /** Which screen corner the minimap sits in. Top-left avoids the game's
-     *  top-right tool/hotbar icons. */
-    public Corner corner = Corner.TOP_LEFT;
     /** On-screen size (px) of the player pointer marker. */
     public int markerSizePx = 16;
 
     // ---- Map rendering ----
-    /** How many world cells span the minimap horizontally (zoom). Smaller = more
-     *  zoomed in. This is the live zoom level; it is changed by the zoom keys /
-     *  {@code /mm zoom} and persisted so it survives world switches. */
-    public int defaultZoomCells = 96;
     /** Discrete zoom levels the zoom-in/out keys step through (cells across). */
     public int[] zoomSteps = {48, 64, 96, 128, 192, 256};
 
-    // ---- Zoom keys (rebindable) ----
-    /** Names (from the game's {@code Key} enum) of the keys that zoom the minimap
-     *  in and out. Default Page Up / Page Down — rarely bound in normal play.
-     *  Rebind with {@code /mm zoomkey} or in the settings panel. */
-    public String zoomInKeyName = "PageUp";
-    public String zoomOutKeyName = "PageDown";
+    // ---- Settings-panel hotkey ----
     /** Name (from the game's {@code Key} enum) of the key that opens/closes the
      *  settings panel (see {@code onKey} in the main plugin class) - not yet
      *  rebindable in-game, only by editing this default. Was originally
@@ -251,17 +239,15 @@ public class MinimapConfig {
     public boolean debugFruitLogging = false;
 
     // ---- Topographic contour overlay ----
-    /** On by default; toggle with /mm contour or the settings panel. */
-    public boolean contourEnabled = true;
+    /** Per-player now (see {@link PlayerPreferences#contourEnabled}) - each
+     *  viewer's own preference picks which of the two rendered variants
+     *  {@link net.picsoul.rw.minimap.render.TileCache} serves for a chunk.
+     *  These remain here only as the shared visual tuning for whichever
+     *  variant gets rendered. */
     public float contourInterval = 4f;
     public int contourMajorEvery = 5;
     public float contourMinorDarken = 0.78f;
     public float contourMajorDarken = 0.58f;
-
-    // ---- Rotation ----
-    /** Off by default; when enabled the map rotates so the player's heading is
-     *  always "up". Toggle with /mm rotate. */
-    public boolean rotate = false;
 
     // ---- Chunk-fetch budgeting ----
     /** Max wall-clock time (ms) the plugin thread may spend building *new* tiles
@@ -494,10 +480,10 @@ public class MinimapConfig {
     public float waypointMinOpacity = 0.6f;
 
     // ---- Waypoint privacy ----
-    /** Privacy filter: show your OWN markers (default + global), but only OTHER
-     *  players' GLOBAL markers — so a player's "default" markers stay private to
-     *  them. Off shows every marker regardless of owner. Toggle /mm wpprivacy. */
-    public boolean waypointPrivacy = true;
+    // Per-player now - see PlayerPreferences#waypointPrivacy. (Filter: show your
+    // OWN markers (default + global), but only OTHER players' GLOBAL markers -
+    // so a player's "default" markers stay private to them. Off shows every
+    // marker regardless of owner. Toggle /mm wpprivacy.)
     /** Proximity fade: a waypoint is at full opacity beyond {@code waypointFadeStartM}
      *  metres, fades linearly as you approach, and is fully hidden within
      *  {@code waypointFadeEndM} metres — reduces clutter when you're at a base.
@@ -615,14 +601,11 @@ public class MinimapConfig {
     public float radarBabyScale = 0.75f;
 
     // ---- Other players on the map (v2.53) ----
-    /** Show every other connected player's live position as a marker, using the
-     *  same teardrop-arrow shape as your own marker (tinted otherPlayerColor so
-     *  it doesn't get confused with your own). Always visible (no distance fade)
-     *  and clamped to the map rim when out of the current zoom range - same
-     *  behavior as the spawn marker, just without its dashed line. Gated behind
-     *  the compass tier (same bucket as waypoints/spawn), not the radar tier -
-     *  this is about other people, not animals/npcs. Toggle /mm players. */
-    public boolean showOtherPlayers = true;
+    // Whether to show them at all is per-player now (PlayerPreferences#
+    // showOtherPlayers, toggle /mm players) - same teardrop-arrow shape as your
+    // own marker (tinted otherPlayerColor below), always visible (no distance
+    // fade), clamped to the map rim when out of zoom range like the spawn
+    // marker. Gated behind the compass tier, not the radar tier.
     public int otherPlayerColor = 0xFF29B6F6;
     public float otherPlayerIconPx = 14f;
     /** Show each other player's name above their marker. Unlike waypoint labels
