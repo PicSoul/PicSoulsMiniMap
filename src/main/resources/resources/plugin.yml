@@ -1,0 +1,5 @@
+name: PicSoulsMiniMap
+version: 0.1.0-M0
+author: PicSoul
+description: PicSoul's Xaero-style minimap for Rising World. M0 skeleton — per-player HUD panel with live coordinates and heading, unlock-gate stub, and craft logging.
+main: net.picsoul.rw.minimap.PicSoulsMiniMap

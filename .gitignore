@@ -1,0 +1,28 @@
+# Build output
+/build/
+/bin/
+/dist/
+.gradle/
+
+# Rising World's own Plugin API SDK (javadoc + jar) - not this project's code;
+# see README for how to point Gradle at your own copy instead.
+/SDK/
+
+# Local dev backups / scratch (superseded by git history)
+/_Backups/
+/_build_backups/
+/_to_delete/
+/New folder/
+/refrence_images/
+
+# Stale local copy of the live game log
+/Game Log/
+
+# Debugging/reference screenshots shared during development - not needed to
+# build or run the plugin
+/screenshots/
+
+# IDE
+.vscode/
+.idea/
+*.iml

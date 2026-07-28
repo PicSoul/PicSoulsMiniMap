@@ -1,0 +1,294 @@
+PicSouls MiniMap - Command List
+================================
+Plugin version: 2.73
+
+All commands are typed in the in-game chat and start with either "/mm" or
+"/minimap" (the two are interchangeable). Commands are not case-sensitive.
+
+Usage: /mm <command>
+
+If you type "/mm" with no command, it runs "toggle".
+
+
+DISPLAY
+-------
+/mm toggle        Show or hide the minimap manually. (This is also what plain
+                  "/mm" does.) Note: the minimap only appears at all if you have
+                  the map equipped - see TIERS below.
+
+/mm rotate        Toggle between a rotating map (your heading always points up)
+                  and a fixed north-up map.
+
+/mm contour       Toggle the topographic contour lines drawn over the terrain.
+                  On by default.
+
+/mm blur [0|1|2]  Set how much the terrain colors blend into each other at
+                  material boundaries (e.g. grass into dirt), so the ground
+                  reads as a soft gradient instead of a hard line. 0 = off
+                  (sharp), 1 = 3x3 blend (default), 2 = 5x5 (softer). With no
+                  number it cycles 0 -> 1 -> 2 -> 0. Player-built construction
+                  blocks are never blurred - they always stay sharp-edged.
+
+/mm caves [on|off]   Toggle cave-opening detection. The surface map is a 2D
+                  heightmap, which normally can't show a real hole in the
+                  ground (a sinkhole, cave mouth, dug shaft) — it just draws
+                  whatever ground it thinks is there. With this ON (default),
+                  a detected opening looks down through it to the real floor
+                  (or a dark "unknown depth" color if none is found within
+                  range) instead of drawing fictitious grass over it.
+
+/mm cavemode [on|off]   Toggle cave mode. While ON (default), the minimap
+                  automatically switches to a local view of the real terrain
+                  around your current altitude — walls as solid rock, open
+                  floors in their real material, darker the deeper below you
+                  — whenever the game reports you're underground
+                  (Player.isInCave()). The map border tints amber while
+                  active. Switches back to the normal surface map once you're
+                  no longer detected as being in a cave. There's a short delay
+                  before switching either way, so standing right at a cave
+                  mouth doesn't flicker the map.
+
+/mm trees [on|off]   Toggle trees on the map (aliases: /mm vegetation). Painted
+                  directly into the terrain as a small canopy blob per tree,
+                  shaped/sized/colored by tree type (conifer, palm, dead,
+                  cactus, deciduous, ...) and its actual size/growth stage, so
+                  a chopped tree disappears from the map as soon as it's gone.
+                  Nothing else (flowers, crops, bushes, ore) is shown.
+
+/mm radar [on|off]   Toggle the entity/radar overlay: nearby animals and npcs
+                  shown as blips, drawn north-up (not rotated to face
+                  direction) for now - the icon size is adjustable in
+                  /mm settings (20px default). The scan range automatically
+                  tracks your current zoom level (covers whatever's actually
+                  visible on the map circle, so npcs show up at any zoom, not
+                  just when zoomed in close), with a 60m floor and a 150m cap.
+                  A mount you're currently riding
+                  hides its own blip (your player marker already shows where
+                  you are - no need for a redundant, laggier one right under
+                  it). If you've dropped a matching
+                  PNG into the plugin's "icons" folder (see below), that
+                  species' real art is used, full color, as-is; otherwise it
+                  falls back to the same teardrop-arrow shape as your own
+                  player marker, tinted by a rough classification: red =
+                  actively hostile, amber = defensive (attacks only if
+                  provoked), green = passive animal, blue = human npc, tan =
+                  mount (wild), purple = saddled mount (tamed/rideable).
+                  Child/baby npc definitions draw a bit smaller than their
+                  adult counterpart. Requires the radar tier - see TIERS
+                  below; the upgraded "compassmodern" grants it, the older
+                  "compassold" does not.
+
+                  Custom icons: PNG files (with alpha) in
+                  "<plugin folder>/icons/", named after the npc's internal
+                  name from /mm npcs, lowercase, e.g. "wolf.png",
+                  "horse.png". Two optional state variants are tried first,
+                  falling back to the plain file if missing: "<name>_hostile
+                  .png" for a currently aggressive/defensive npc, and
+                  "<name>_saddled.png" for a currently-saddled mount. Files
+                  are read fresh from disk on the next world load, not baked
+                  into the plugin jar, so updating art needs no rebuild - just
+                  drop in the file and switch worlds (or restart) to see it.
+
+/mm npcs          Log every npc (animal/human/monster) type REGISTERED in the
+/mm entities      game - not just ones nearby - to the server console, grouped
+                  by type (Human/Animal/Mount/Skeleton) with its internal id
+                  and display name. Use this to get the full roster of what
+                  exists, e.g. for planning custom per-species radar icons.
+
+/mm players [on|off]   Toggle other-connected-player markers on the map: every
+                  other player's live position and name, using the same
+                  teardrop-arrow shape as your own marker (a distinct tint so
+                  it's never confused with yours). Always visible - no
+                  distance fade - and clamped to just inside the rim when
+                  out of the current zoom range, the same behavior as the
+                  spawn marker (just without its dashed line). Requires the
+                  compass tier, same as waypoints/spawn.
+
+/mm fruitdebug [on|off]   Diagnostic. Logs every fruit tree the renderer
+                  processes near you straight to the server console (name,
+                  pickupitem, whether it resolved as fruiting, canopy radius)
+                  — for tracking down why fruit accent dots don't show on the
+                  map for a visibly fruiting tree. Forces an immediate
+                  re-render so it starts logging right away.
+
+/mm smooth        Toggle smooth panning (position/heading interpolation) on or
+                  off. On by default for glide-smooth movement at high speed.
+
+/mm zoom [in|out|reset|<cells>]   Zoom the minimap. "in"/"out" step through the
+                  zoom levels, "reset" returns to the default, and a number sets
+                  how many world cells span the map directly. By default you can
+                  also zoom with the Page Up (in) and Page Down (out) keys. The
+                  zoom level is remembered across world switches.
+
+/mm zoomkey in|out <KeyName>   Rebind the zoom-in or zoom-out key. Use a key name
+                  like PageUp, PageDown, LeftBracket, RightBracket, Equals, Minus,
+                  NumpadPlus, NumpadMinus, Home, End. Persists. (You can also
+                  rebind from the settings window - see /mm settings.)
+
+/mm settings      Open or close the settings window (aliases: /mm menu, /mm ui).
+                  The F1 key also toggles it, same as this command - not yet
+                  rebindable in-game. Shows the zoom keys and lets you rebind
+                  them: click Change, then press any key (Esc cancels).
+                  Sliders for the entity/radar icon size and the overall map
+                  size - click anywhere
+                  along a bar to set it (no drag, just click-to-set). A button
+                  to cycle which screen corner the map sits in, and ON/OFF
+                  toggles for map rotation (same as /mm rotate) and contour
+                  lines (same as /mm contour, on by default). Map size and
+                  corner persist across world switches, same as zoom. A
+                  "Reset to Defaults" button resets everything on this page
+                  (zoom keys, entity icon size, map size/corner, rotate,
+                  contour) - not the /mm diagreset diagnostic switches, which
+                  are a separate set of crash-diagnosis dev toggles. Your
+                  mouse cursor is freed while the window is open.
+
+
+WAYPOINTS & SPAWN  (require a compass equipped to be visible)
+-----------------
+/mm waypoints     Toggle the map waypoint markers on or off.
+/mm wp            Short alias for "/mm waypoints".
+
+/mm waypoints refresh   Immediately reload the waypoint list from the game's map
+/mm wp refresh          (they otherwise auto-refresh every few seconds).
+
+/mm spawn         Toggle the dashed line + marker pointing to your current
+                  spawn point.
+
+/mm wpprivacy [on|off]   Waypoint privacy. ON (default): your own map markers all
+                  show on the minimap (both Default and Global), but you only see
+                  OTHER players' markers if they set them to Global - so Default
+                  markers stay private to whoever made them. OFF shows every marker
+                  regardless of owner. Persists.
+
+
+TIERS / STATUS
+--------------
+The minimap upgrades in tiers based on the items you have. You do not turn these
+on with commands - they switch on automatically when you equip/own the items:
+
+  * Map equipped        -> basic minimap (terrain + X/Y/Z coordinates)
+  * Compass equipped    -> cardinal directions, waypoints, and the spawn line
+                           (compassold or compassmodern - either one)
+  * Clock equipped      -> current in-game time, shown under the coordinates
+  * Calendar owned      -> current in-game date (permanent once crafted/looted)
+  * Compassmodern       -> also unlocks the entity/radar tier (see /mm radar
+    equipped              above). Equipping compassmodern gives you BOTH the
+                           regular compass tier and the radar tier; compassold
+                           only ever gives the regular compass tier.
+
+/mm status        Show which tiers are currently active (map/compass/watch/
+/mm caps          calendar/radar) and whether the minimap is visible. Also
+                  prints the raw in-game time/date the plugin reads (day-of-year,
+                  hour, minute, year) and the diagnostic switch states (see below).
+
+/mm dev           Toggle "dev mode": forces ALL tiers on regardless of what you
+                  have equipped or owned. Handy for testing. Run it again to
+                  turn it back off.
+
+
+DIAGNOSTICS
+-----------
+/mm ids           Log diagnostic info to the server console and chat: the terrain
+                  surface material ids around you, the names of the items in your
+                  Equipment and Quickslot slots, every unique tree definition
+                  (by internal id, not just name — two trees can share a display
+                  name like "Apple tree" but be different definitions) in your
+                  current chunk, dumped with every field that might matter for
+                  rendering: type, windparam, extent, stage, and every
+                  pickup/harvest/destroy-item field — and every npc (animal/
+                  human/monster) within radar range, with its name, type,
+                  behaviour, dead/invisible flags and raw view-direction vector.
+                  Use this to check the exact item names the plugin sees (for
+                  calibrating item detection) and to report real tree/npc data
+                  back for the tree shape/color/size/fruiting tables and the
+                  radar classification/color tables.
+
+/mm perf          Toggle performance logging. While on, timing stats are written
+                  to the server console about every 5 seconds. Just play normally
+                  and read the console; run it again to stop.
+
+/mm terrain [on|off]   Master switch for terrain-image rendering (all chunk reads).
+                  With no argument it toggles. Turn OFF to test whether reading
+                  chunk terrain is what causes the world-switch crash: the map
+                  frame, marker, coordinates and waypoints still show, only the
+                  terrain picture is skipped. This setting PERSISTS across world
+                  switches (saved to diagnostics.txt), so set it, then switch
+                  worlds, and see if the crash stops.
+
+/mm mapdb [on|off]     Master switch for all map-database reads: the Maps.db
+                  waypoint reads AND the spawn-point lookup. With no argument it
+                  toggles. Turn OFF to test whether the database access is what
+                  causes the world-switch crash (spawn falls back to the world
+                  default while off). Also PERSISTS across world switches.
+
+/mm notex [on|off]     Master switch for ALL texture creation. "on" means textures
+                  are turned OFF: the plugin then creates no textures at all - the
+                  player marker, waypoint icons and spawn marker become plain
+                  colored dots and the terrain image is skipped. Coordinates,
+                  cardinals, time/date, waypoint positions, the spawn line and
+                  labels all still work. Applied immediately. PERSISTS across
+                  world switches. Used to test whether creating textures is what
+                  causes the world-switch crash.
+
+/mm hud [on|off]       Master switch for the HUD itself. Turn OFF and the plugin
+                  attaches no UI elements at all - it stays loaded and still
+                  answers commands, but nothing is drawn on screen. Also PERSISTS
+                  across world switches. Used to test whether creating UI elements
+                  is what causes the world-switch crash.
+
+/mm minimal [on|off]    Diagnostic. Replaces the whole minimap with a single
+                  coordinates label (just 2 on-screen elements, no map circle, no
+                  marker, no textures). Tests whether attaching ANY user interface
+                  after a world switch is fatal. Applied immediately.
+                  Persists.
+
+/mm uilite [on|off]     Diagnostic. Builds the minimap with tiny element pools
+                  (about 40 on-screen elements instead of about 190) by shrinking
+                  the waypoint icon, dash and label pools to 8 each. Used to test
+                  whether the sheer number of UI elements is what crashes a
+                  switched world. Rejoin the world to apply. Persists.
+
+/mm teardown full|roots|none    Controls what the plugin does with its on-screen
+                  elements when it unloads during a world switch. "full" (default)
+                  removes everything; "roots" removes only the two main containers;
+                  "none" (the DEFAULT) removes nothing and lets the game clean up
+                  by itself. "none" is the fix for the world-switch crash - removing
+                  elements while the plugin unloads is what crashed the next world.
+                  The other two settings reproduce the crash; for diagnosis only.
+                  Persists.
+
+/mm safemode [on|off]   Controls what happens after you switch worlds from the
+                  main menu. ON (default) means the minimap stays off for the rest
+                  of that game session, because showing it after a world switch
+                  crashes the game; restart the game to use the minimap again. A
+                  fresh game start is unaffected - the minimap works normally in
+                  the first world you load. Turning it off attaches the minimap
+                  anyway and will most likely crash; for diagnosis only. Persists.
+
+/mm mapguard [on|off]   Hides the minimap while you are holding the vanilla map,
+                  so the plugin's UI is never on screen at the same moment the
+                  game opens its own map. ON by default - this is the current
+                  world-switch crash fix. Turn it off only for testing. Persists.
+
+/mm hudgrace <seconds>   Show or set how long the minimap waits before appearing
+                  after you switch worlds from the main menu. Attaching the
+                  minimap too early in a second world crashes the game, so it is
+                  deliberately delayed (default 15 seconds). This delay applies
+                  ONLY after a world switch - on a fresh game start the minimap
+                  appears immediately. Raise it (e.g. "/mm hudgrace 25") if
+                  switching worlds ever still crashes. Persists.
+
+/mm diagreset     Restore ALL diagnostic switches at once: terrain, mapdb,
+                  textures, hud, mapguard and safemode back ON, uilite and minimal
+                  back OFF, and the world-switch delay back to 15s. The minimap is
+                  rebuilt immediately, so there is no need to rejoin the world
+                  back to their normal ON state in one go.
+
+/mm version       Print the current plugin version in chat.
+
+
+Full command summary:
+  /mm [toggle | status | caps | dev | ids | npcs | entities | perf | contour | blur | caves | cavemode |
+       trees | radar | players | fruitdebug | smooth | rotate | zoom | zoomkey | settings | waypoints |
+       wp | wpprivacy | spawn | terrain | mapdb | notex | hud | mapguard | safemode | uilite | minimal |
+       teardown | hudgrace | diagreset | version]

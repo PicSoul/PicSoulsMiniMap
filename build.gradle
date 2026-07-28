@@ -1,0 +1,30 @@
+plugins {
+    id 'java'
+}
+
+group = 'net.picsoul.rw'
+version = '0.1.0-M0'
+
+java {
+    // Rising World's new Plugin API runs on JDK 20.
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(20)
+    }
+}
+
+// Path to the Rising World Plugin API jar that ships with the game.
+// Override via -Prw.sdk=<path> or in gradle.properties if your install differs.
+def rwSdk = project.findProperty('rw.sdk') ?:
+        'X:/SteamLibrary/steamapps/common/RisingWorld/Data/SDK/PluginAPI.jar'
+
+dependencies {
+    // Provided by the game at runtime — compile against it, do NOT bundle it.
+    compileOnly files(rwSdk)
+}
+
+tasks.named('jar') {
+    archiveBaseName = 'PicSoulsMiniMap'
+    archiveVersion = ''
+    // plugin.yml lives in src/main/resources and is copied to the jar root,
+    // which is where Rising World looks for it.
+}
