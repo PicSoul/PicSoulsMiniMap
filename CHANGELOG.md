@@ -2550,3 +2550,29 @@ written.
   NOTE: wants confirmation that edits (tree blobs specifically) now update
   noticeably faster, and that the boundary-seam issue is less visible/
   shorter-lived than before, at the new 60/min default.
+
+- **v2.86: raised the real per-frame render budget - 60/min was still not
+  acceptable, and the user found the actual bottleneck.** User tested 600,
+  1000, 2000, and 10000 renders/min: none crashed, but past a few hundred,
+  raising it further changed nothing observable - meaning `TileCache`'s
+  per-minute cap wasn't the actual throughput ceiling above that point.
+  Separately, the user precisely diagnosed the blank-edge-tile complaint:
+  `MapRenderer.snapshot()`'s missing-chunk list expands outward from the
+  player in rings each pass ("looks like a plus sign"), and whatever a
+  single pass's time budget can't reach gets deferred - at the existing 3ms
+  budget, a wide zoomed-out view could take many passes to ever reach the
+  outer rim, especially under continuous movement re-prioritizing nearby
+  chunks each time. Both observations point at the same thing: the real
+  per-frame ceiling is `snapshotBudgetMs` (3ms), not `maxChunkRendersPerWindow`
+  - explaining why the per-minute cap stopped mattering past a few hundred,
+  and why raising it alone couldn't fix edge catch-up speed.
+  Raised `snapshotBudgetMs` 3f -> 8f (covers more chunks per frame, directly
+  speeding up edge catch-up when zoomed out) and `maxChunkRendersPerWindow`
+  60 -> 2000 (comfortably above the new snapshotBudgetMs-driven ceiling, so
+  it no longer competes with catch-up speed, while still a real backstop
+  far below "no cap at all").
+  NOTE: the 3-5 minute tests at 600-10000/min are NOT long enough to confirm
+  those rates are safe over the full ~9-14 minute window every crash so far
+  happened in - wants a proper long test (15+ minutes, including fast
+  flight) at these new defaults before treating stability as settled, plus
+  confirmation that edge tiles now fill in fast enough when zoomed out.

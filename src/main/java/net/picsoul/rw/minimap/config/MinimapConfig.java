@@ -253,8 +253,22 @@ public class MinimapConfig {
     /** Max wall-clock time (ms) the plugin thread may spend building *new* tiles
      *  per render. Chunks beyond the budget are deferred to later renders, so the
      *  minimap never freezes when many new chunks must load at once (e.g. boating
-     *  into fresh open ocean). Cached tiles are free and don't count. */
-    public float snapshotBudgetMs = 3f;
+     *  into fresh open ocean). Cached tiles are free and don't count.
+     *
+     * <p>v2.86: user found that raising {@link #maxChunkRendersPerWindow} (a
+     * per-MINUTE cap) past a few hundred stopped changing anything - the real
+     * per-frame throughput ceiling was always this budget, not that cap. That
+     * also explained a distinct complaint (blank tiles near the minimap edge
+     * when zoomed out): the missing-chunk list expands outward from the
+     * player in rings each pass ("looks like a plus sign" per the user), so
+     * whatever this budget can't reach in one pass gets deferred - and at
+     * 3ms, a wide zoomed-out view could take many passes to ever reach the
+     * outer rim, especially under continuous movement re-prioritizing nearby
+     * chunks each time. Raised 3f -> 8f to cover more ground per frame and
+     * speed up edge catch-up; observed spikes even on the slow per-cell
+     * fallback path (18-35ms, v2.80) didn't crash on their own, so this is a
+     * moderate increase, not a reach into previously-unseen territory. */
+    public float snapshotBudgetMs = 8f;
     /** After a chunk is found not-yet-loaded, wait this long (seconds) before
      *  asking the game for it again. Prevents repeatedly blocking on chunks the
      *  game hasn't generated yet (the open-ocean stall). */
@@ -293,13 +307,25 @@ public class MinimapConfig {
      * minutes (~75/min average). The user then tested 40, 60, 80, and 120/
      * min with the fix in place - none crashed, though noticeable
      * delay/staleness remained even at 120 (a direct, expected cost of
-     * throttling). 60 is a middle-ground default: comfortably above every
-     * value that felt too restrictive, comfortably below the one
-     * unthrottled rate that did eventually crash. Not a proven-safe number,
-     * just the best empirical balance so far - keep tuning with
-     * {@code /mm renderrate} as more data comes in.
+     * throttling).
+     *
+     * <p>v2.86: user then tested 600, 1000, 2000 and 10000/min - none
+     * crashed, but only for ~3-5 minutes each, well short of the ~9-14
+     * minute window every crash so far happened in, so this does NOT yet
+     * confirm those rates are actually safe over a full session. It did
+     * reveal that past a few hundred/min, raising this further changed
+     * nothing observable - the real per-frame ceiling is
+     * {@link #snapshotBudgetMs} (also raised this version), not this
+     * per-minute count. Set to 2000: comfortably above the new
+     * snapshotBudgetMs-driven ceiling (so this cap itself no longer competes
+     * with edge-tile catch-up speed), while still a real, finite backstop
+     * far below "no cap at all" for pathologically long sessions. Still not
+     * proven safe over the full crash window at this value - wants a proper
+     * long test (past 15 minutes, ideally with fast flight) before treating
+     * the stability question as settled. Tune live with
+     * {@code /mm renderrate <perMinute>}.
      */
-    public int maxChunkRendersPerWindow = 60;
+    public int maxChunkRendersPerWindow = 2000;
     /** Rolling window (seconds) {@link #maxChunkRendersPerWindow} applies to. */
     public float chunkRenderRateWindowSeconds = 60f;
 
