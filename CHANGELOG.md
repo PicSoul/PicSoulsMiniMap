@@ -2576,3 +2576,24 @@ written.
   happened in - wants a proper long test (15+ minutes, including fast
   flight) at these new defaults before treating stability as settled, plus
   confirmation that edge tiles now fill in fast enough when zoomed out.
+
+- **v2.87: reverted the v2.86 budget increase - it crashed faster than
+  ever.** The blank-edge-tile issue was in fact fixed (confirmed: only
+  visible right after loading, fully populated after moving around a bit)
+  - but the v2.86 combination (`snapshotBudgetMs` 8ms, `maxChunkRendersPerWindow`
+  2000) crashed in ~3 minutes, faster than any previous session (previous
+  floor was ~9 minutes), at ~415 total renders. This confirms sustained
+  real chunk-read RATE is a genuine factor in the crash, not just total
+  count or session duration - so both settings reverted to the last
+  values with no crash reports across multiple tests: `snapshotBudgetMs`
+  back to 3f, `maxChunkRendersPerWindow` back to 60. The blank-edge-on-
+  zoom-out issue is therefore back until the real fix (below) lands.
+  User proposed persisting rendered tiles to disk per world (keyed by
+  chunk coordinate), invalidated only by actual edits - the same approach
+  other games' minimaps typically use - so a previously-seen chunk never
+  needs a second native chunk-API read at all, rather than just being
+  rate-limited. This is a stronger fix than anything tried so far: most
+  play revisits already-seen terrain far more than it discovers new
+  terrain, so this would eliminate the large majority of real chunk reads
+  entirely instead of merely throttling them. Design work for this starts
+  next version.

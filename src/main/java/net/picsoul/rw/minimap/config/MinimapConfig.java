@@ -255,20 +255,19 @@ public class MinimapConfig {
      *  minimap never freezes when many new chunks must load at once (e.g. boating
      *  into fresh open ocean). Cached tiles are free and don't count.
      *
-     * <p>v2.86: user found that raising {@link #maxChunkRendersPerWindow} (a
-     * per-MINUTE cap) past a few hundred stopped changing anything - the real
-     * per-frame throughput ceiling was always this budget, not that cap. That
-     * also explained a distinct complaint (blank tiles near the minimap edge
-     * when zoomed out): the missing-chunk list expands outward from the
-     * player in rings each pass ("looks like a plus sign" per the user), so
-     * whatever this budget can't reach in one pass gets deferred - and at
-     * 3ms, a wide zoomed-out view could take many passes to ever reach the
-     * outer rim, especially under continuous movement re-prioritizing nearby
-     * chunks each time. Raised 3f -> 8f to cover more ground per frame and
-     * speed up edge catch-up; observed spikes even on the slow per-cell
-     * fallback path (18-35ms, v2.80) didn't crash on their own, so this is a
-     * moderate increase, not a reach into previously-unseen territory. */
-    public float snapshotBudgetMs = 8f;
+     * <p>v2.86 raised this 3f -> 8f (more chunks per frame, faster blank-edge
+     * catch-up when zoomed out) alongside raising {@link
+     * #maxChunkRendersPerWindow} 60 -> 2000 - but the resulting session
+     * crashed faster than any before it (~3 minutes, vs. the previous ~9-14
+     * minute floor), confirming sustained real chunk-read RATE genuinely
+     * matters, not just raw count or session duration. Reverted back to 3f
+     * (v2.85's last-confirmed-safe value) as an immediate stopgap while a
+     * proper fix - persisting rendered tiles to disk per world, so a
+     * previously-seen chunk never needs a second native read at all - is
+     * built (see {@link #maxChunkRendersPerWindow}'s doc for the same
+     * story). This does mean the blank-edge-on-zoom-out issue is back until
+     * that lands. */
+    public float snapshotBudgetMs = 3f;
     /** After a chunk is found not-yet-loaded, wait this long (seconds) before
      *  asking the game for it again. Prevents repeatedly blocking on chunks the
      *  game hasn't generated yet (the open-ocean stall). */
@@ -309,23 +308,24 @@ public class MinimapConfig {
      * delay/staleness remained even at 120 (a direct, expected cost of
      * throttling).
      *
-     * <p>v2.86: user then tested 600, 1000, 2000 and 10000/min - none
-     * crashed, but only for ~3-5 minutes each, well short of the ~9-14
-     * minute window every crash so far happened in, so this does NOT yet
-     * confirm those rates are actually safe over a full session. It did
-     * reveal that past a few hundred/min, raising this further changed
-     * nothing observable - the real per-frame ceiling is
-     * {@link #snapshotBudgetMs} (also raised this version), not this
-     * per-minute count. Set to 2000: comfortably above the new
-     * snapshotBudgetMs-driven ceiling (so this cap itself no longer competes
-     * with edge-tile catch-up speed), while still a real, finite backstop
-     * far below "no cap at all" for pathologically long sessions. Still not
-     * proven safe over the full crash window at this value - wants a proper
-     * long test (past 15 minutes, ideally with fast flight) before treating
-     * the stability question as settled. Tune live with
-     * {@code /mm renderrate <perMinute>}.
+     * <p>v2.86 briefly tried 600-10000/min alongside a raised {@link
+     * #snapshotBudgetMs} - none crashed in 3-5 minute tests, but the
+     * combination then crashed FASTER than ever (~3 minutes) once actually
+     * played long enough, confirming sustained real chunk-read rate is a
+     * genuine factor, not just total count or session length. Reverted to
+     * 60 (the last value with no crash reports across multiple tests) as an
+     * immediate stopgap.
+     *
+     * <p>v2.87 direction: rather than keep hunting for a "safe" rate by
+     * trial and error, the real fix is eliminating most real reads
+     * entirely - persist each chunk's rendered tile to disk, per world, so
+     * a chunk already seen (in this session or any previous one) never
+     * needs a second native read unless an edit actually invalidates it.
+     * This rate limiter becomes a backstop for genuinely new terrain rather
+     * than the primary defense. Tune live with {@code /mm renderrate
+     * <perMinute>} in the meantime.
      */
-    public int maxChunkRendersPerWindow = 2000;
+    public int maxChunkRendersPerWindow = 60;
     /** Rolling window (seconds) {@link #maxChunkRendersPerWindow} applies to. */
     public float chunkRenderRateWindowSeconds = 60f;
 
