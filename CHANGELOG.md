@@ -2597,3 +2597,53 @@ written.
   terrain, so this would eliminate the large majority of real chunk reads
   entirely instead of merely throttling them. Design work for this starts
   next version.
+
+- **v2.88: persist rendered map tiles to disk, per world.** Implements the
+  v2.87 design: every rendered chunk tile is now saved to a small local file
+  (`int[1024]` raw, 4KB, one per chunk per contour variant) under the plugin
+  folder, keyed by chunk position and the current world's own folder name
+  (`World.getWorldFolder()`, resolved the same lazy way
+  `WaypointService.connection()` already does). Stored under a
+  format-version subfolder (`tilecache/v1/<world>/`) so a future rendering
+  change can just bump the version and orphan the old cache automatically
+  instead of silently showing stale colors.
+  New `TileDiskCache` (render package) owns all the file I/O -
+  `load`/`save`/`delete`/`clear`, every operation defensive (any I/O
+  failure - missing file, wrong size, permission error, world not ready yet
+  - is treated as a plain cache miss, never thrown; this is purely an
+  optimization, never a correctness requirement).
+  `TileCache.get()` now checks disk *before* the rate limiter at all: a
+  disk hit costs nothing against `maxChunkRendersPerWindow` and doesn't
+  touch `World.getChunk`/`Chunk` in any way, so revisiting already-seen
+  terrain is now instant regardless of the render-rate setting. Only
+  genuinely new terrain (or a chunk an edit invalidates) still goes through
+  the existing rate-limited real-render path. `TileCache.invalidate()`
+  (already wired to the terrain/construction/vegetation edit events via
+  `PicSoulsMiniMap.onWorldEdit`) now also deletes the chunk's on-disk
+  copy - unlike the in-memory stale tile (which just sits briefly until
+  next viewed), a stale disk file would otherwise survive indefinitely
+  across sessions.
+  Added a `diskHits` lifetime counter (alongside the existing
+  `lifetimeRenders`, which now only counts genuine native renders - disk
+  hits and the `/mm fakechunk` diagnostic no longer inflate it) surfaced in
+  the periodic `[diag] session totals` log line, so the cache's effect is
+  directly observable rather than inferred from smoothness alone. New
+  `/mm tilecache clear` command deletes the on-disk + in-memory cache for
+  the current world (a manual release valve, on top of the automatic
+  version-folder staleness handling).
+  Deliberately out of scope: cave mode (`renderCaveAsync` never used
+  `TileCache`, unaffected); no size cap/eviction on the disk cache (each
+  tile is ~4KB, even a heavily-explored world lands in the low hundreds of
+  MB - the clear command is the release valve if that ever matters); the
+  render-rate limiter and snapshot budget are left at their last
+  no-crash-reported values (60/min, 3ms) as the safety net for genuinely
+  new terrain.
+  NOTE: this is the actual fix this whole investigation (v2.76-v2.87) has
+  been building toward - wants the full verification pass: explore new
+  terrain (renders + disk writes happen), leave and revisit it (instant,
+  `diskHits` climbing not `lifetimeRenders`), edit something already-cached
+  (map picks up the change, proving invalidate -> delete -> fresh render
+  works), and finally a real long session (15+ min, mixed old/new terrain,
+  some fast flight) to see whether real chunk-API call volume - now mostly
+  limited to first-time discovery - stays low enough to avoid the crash
+  entirely.

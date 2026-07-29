@@ -110,8 +110,21 @@ public final class TileCache {
         return lifetimeRenders;
     }
 
-    public TileCache(MinimapConfig config) {
+    /** Diagnostic (v2.88): lifetime count of tiles served from {@link
+     *  #diskCache} instead of a real World/Chunk call - see TileDiskCache's
+     *  own doc for why this exists. Should climb far faster than {@link
+     *  #lifetimeRenders} once a world has been explored a bit. */
+    private long diskHits = 0;
+
+    public long diskHits() {
+        return diskHits;
+    }
+
+    private final TileDiskCache diskCache;
+
+    public TileCache(MinimapConfig config, String pluginFolder) {
         this.config = config;
+        this.diskCache = new TileDiskCache(pluginFolder);
     }
 
     private static long key(int cx, int cz) {
@@ -169,25 +182,37 @@ public final class TileCache {
             // exactly as normal - see MinimapConfig#diagFakeChunkData.
             tile = fakeTile(cx, cz);
         } else {
-            if (!allowRealChunkRender(now)) {
-                // Rate-limited (see MinimapConfig#maxChunkRendersPerWindow) -
-                // treat like a "not ready" miss so this retries once the
-                // window has room again, rather than blocking outright.
-                misses.put(k, now);
-                return cached;
+            // v2.88: check disk before ever touching the real native API - a
+            // previously-rendered, still-valid chunk loads from a small local
+            // file instead of costing another World/Chunk call. Not subject
+            // to the rate limiter below at all (see TileDiskCache's doc).
+            tile = diskCache.load(cx, cz, contourOn);
+            if (tile != null) {
+                diskHits++;
+            } else {
+                if (!allowRealChunkRender(now)) {
+                    // Rate-limited (see MinimapConfig#maxChunkRendersPerWindow) -
+                    // treat like a "not ready" miss so this retries once the
+                    // window has room again, rather than blocking outright.
+                    misses.put(k, now);
+                    return cached;
+                }
+                Chunk chunk;
+                try {
+                    chunk = World.getChunk(cx, cz);
+                } catch (Exception e) {
+                    misses.put(k, now);
+                    return cached;
+                }
+                tile = TileRenderer.render(chunk, config, contourOn);
+                if (tile != null) {
+                    rendersThisWindow++;
+                    lifetimeRenders++;
+                    diskCache.save(cx, cz, contourOn, tile);
+                }
             }
-            Chunk chunk;
-            try {
-                chunk = World.getChunk(cx, cz);
-            } catch (Exception e) {
-                misses.put(k, now);
-                return cached;
-            }
-            tile = TileRenderer.render(chunk, config, contourOn);
-            if (tile != null) rendersThisWindow++;
         }
         if (tile != null) {
-            lifetimeRenders++;
             if (v == null) {
                 v = new Variants();
                 tiles.put(k, v);
@@ -231,11 +256,25 @@ public final class TileCache {
         Variants v = tiles.get(k);
         if (v != null) v.markBothDirty();
         misses.remove(k); // don't let a stale "not loaded" cooldown block retrying
+        // v2.88: also drop the on-disk copy. Unlike the in-memory stale tile
+        // (which just sits there briefly until this chunk is next viewed and
+        // refreshed), a stale disk file could otherwise persist indefinitely
+        // - disk survives across sessions, so an edit made while this chunk
+        // isn't in view would leave permanently wrong terrain cached until
+        // someone happens to look at it again with rendering active.
+        diskCache.delete(cx, cz);
     }
 
     public void clear() {
         tiles.clear();
         misses.clear();
+    }
+
+    /** Deletes the entire on-disk cache for the current world - the manual
+     *  release valve behind {@code /mm tilecache clear}. Does not touch the
+     *  in-memory cache; call {@link #clear()} too if a full reset is wanted. */
+    public void clearDisk() {
+        diskCache.clear();
     }
 
     public int size() {

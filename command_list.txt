@@ -1,6 +1,6 @@
 PicSouls MiniMap - Command List
 ================================
-Plugin version: 2.87
+Plugin version: 2.88
 
 All commands are typed in the in-game chat and start with either "/mm" or
 "/minimap" (the two are interchangeable). Commands are not case-sensitive.
@@ -287,6 +287,12 @@ DIAGNOSTICS
                   machinery. NOT persisted - always resets to off on
                   restart/world switch.
 
+/mm tilecache clear   Deletes the on-disk rendered-tile cache for the current
+                  world (see "Map tile caching" below), plus the in-session
+                  memory cache - every visible chunk gets freshly re-rendered
+                  from scratch. Use if you suspect a cached tile looks wrong,
+                  or just want to force a full refresh.
+
 /mm teardown full|roots|none    Controls what the plugin does with its on-screen
                   elements when it unloads during a world switch. "full" (default)
                   removes everything; "roots" removes only the two main containers;
@@ -336,12 +342,24 @@ DIAGNOSTICS
 /mm version       Print the current plugin version in chat.
 
 
+Map tile caching
+-----------------
+Each rendered terrain tile is saved to disk per world (under the plugin
+folder, keyed by chunk position), not just kept in memory for the current
+session. A chunk you've already seen loads instantly from that file instead
+of being re-rendered - only genuinely new terrain, or a chunk you've actually
+edited (placed a block, cut a tree, dug into the ground), needs a fresh
+render. This is why the map fills in fast on a world you've explored before,
+even right after a restart. See /mm tilecache clear if you ever want to force
+a full refresh.
+
+
 Full command summary:
   /mm [toggle | status | caps | dev | ids | npcs | entities | perf | contour | blur | caves | cavemode |
        trees | radar | players | hidden | fruitdebug | smooth | rotate | zoom | zoomkey | settings |
        waypoints | wp | wpprivacy | spawn | terrain | mapdb | notex | hud | mapguard | safemode | uilite |
-       minimal | teardown | hudgrace | renderrate | fakerender | rawterrain | fakechunk | diagreset |
-       version]
+       minimal | teardown | hudgrace | renderrate | tilecache | fakerender | rawterrain | fakechunk |
+       diagreset | version]
 
 Player settings (map size/corner, zoom keys/level, rotate, contour, waypoint
 privacy, players/hidden toggles) are now saved per player, in

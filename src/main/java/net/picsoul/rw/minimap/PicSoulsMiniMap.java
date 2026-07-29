@@ -58,7 +58,7 @@ import net.picsoul.rw.minimap.waypoint.WaypointService;
 
 public class PicSoulsMiniMap extends Plugin implements Listener {
 
-    public static final String PLUGIN_VERSION = "2.87";
+    public static final String PLUGIN_VERSION = "2.88";
     private static final String TAG = "[PicSoulsMiniMap]";
     /** Item type id of the vanilla map (confirmed from the game log: "map (59)"). */
     private static final short VANILLA_MAP_TYPE_ID = 59;
@@ -142,7 +142,7 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
         hudReady = !worldSwitch;
         safeModeActive = worldSwitch && config.worldSwitchSafeMode;
         capabilityService = new CapabilityService(this, config);
-        tileCache = new TileCache(config);
+        tileCache = new TileCache(config, getPath());
         renderWorker = Executors.newSingleThreadExecutor(r -> {
             Thread t = new Thread(r, "PicSoulsMiniMap-Render");
             t.setDaemon(true);
@@ -342,8 +342,9 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
                 long maxMB = rt.maxMemory() / (1024 * 1024);
                 System.out.println(String.format(
                         TAG + "[diag] session totals: uptimeSec=%.0f tilesCached=%d lifetimeRenders=%d"
-                                + " heapUsedMB=%d heapMaxMB=%d",
-                        now, tileCache.size(), tileCache.lifetimeRenders(), usedMB, maxMB));
+                                + " diskHits=%d heapUsedMB=%d heapMaxMB=%d",
+                        now, tileCache.size(), tileCache.lifetimeRenders(), tileCache.diskHits(),
+                        usedMB, maxMB));
             }
         }
         if (mapDirty) {
@@ -983,6 +984,17 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
                         : "OFF — real terrain data restored")
                         + ". NOT persisted — resets to off on restart/world switch.");
             }
+            case "tilecache" -> {
+                if (parts.length > 2 && parts[2].equalsIgnoreCase("clear")) {
+                    tileCache.clearDisk();
+                    tileCache.clear();
+                    session.invalidateMap();
+                    player.sendTextMessage(TAG + " tile cache cleared (disk + memory) for this world -"
+                            + " every visible chunk will be freshly re-rendered.");
+                } else {
+                    player.sendTextMessage(TAG + " usage: /mm tilecache clear");
+                }
+            }
             case "teardown" -> {
                 if (parts.length > 2) {
                     String m = parts[2].toLowerCase();
@@ -1104,7 +1116,7 @@ public class PicSoulsMiniMap extends Plugin implements Listener {
             case "version" -> {
                 player.sendTextMessage(TAG + " version " + PLUGIN_VERSION);
             }
-            default -> player.sendTextMessage(TAG + " usage: /mm [toggle|status|caps|dev|ids|perf|contour|blur|caves|cavemode|trees|fruitdebug|smooth|rotate|zoom|zoomkey|settings|waypoints|wpprivacy|spawn|players|hidden|terrain|mapdb|notex|hud|mapguard|safemode|uilite|minimal|teardown|hudgrace|renderrate|fakerender|rawterrain|fakechunk|diagreset|version]");
+            default -> player.sendTextMessage(TAG + " usage: /mm [toggle|status|caps|dev|ids|perf|contour|blur|caves|cavemode|trees|fruitdebug|smooth|rotate|zoom|zoomkey|settings|waypoints|wpprivacy|spawn|players|hidden|terrain|mapdb|notex|hud|mapguard|safemode|uilite|minimal|teardown|hudgrace|renderrate|tilecache|fakerender|rawterrain|fakechunk|diagreset|version]");
         }
     }
 
